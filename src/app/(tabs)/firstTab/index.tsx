@@ -89,9 +89,11 @@ export default function FirstTab() {
       }
     } catch (error) {
       console.error("Error requesting OTP:", error);
-      setMessage("Failed to send OTP");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to send OTP";
+      setMessage(errorMessage);
       setIsOtpStep(false);
-      Alert.alert("OTP request failed", "Failed to send OTP");
+      Alert.alert("OTP request failed", errorMessage);
     } finally {
       setIsRequestingOtp(false);
     }
