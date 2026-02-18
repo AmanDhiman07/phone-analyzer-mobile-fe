@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, Pressable, Alert, FlatList } from "react-native";
+import { View, Text, Pressable, FlatList, Modal } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -69,6 +69,8 @@ function BackupListItem({
 export default function HistoryScreen() {
   const router = useRouter();
   const [backups, setBackups] = useState<BackupRecord[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<BackupRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadBackups = useCallback(async () => {
     const list = await listBackups();
@@ -81,29 +83,75 @@ export default function HistoryScreen() {
     }, [loadBackups]),
   );
 
-  const handleDelete = useCallback(
-    (item: BackupRecord) => {
-      Alert.alert(
-        "Delete backup",
-        `Delete backup from ${formatBackupDate(item.date)}?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: async () => {
-              await deleteBackup(item.folderName);
-              await loadBackups();
-            },
-          },
-        ],
-      );
-    },
-    [loadBackups],
-  );
+  const handleDelete = useCallback((item: BackupRecord) => {
+    setDeleteTarget(item);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deleteBackup(deleteTarget.folderName);
+      setDeleteTarget(null);
+      await loadBackups();
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deleteTarget, loadBackups]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#0f172a]" edges={["top", "bottom"]}>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={!!deleteTarget}
+        onRequestClose={() => {
+          if (!isDeleting) setDeleteTarget(null);
+        }}
+      >
+        <View className="flex-1 bg-black/60 items-center justify-center px-6">
+          <View className="w-full max-w-[360px] rounded-2xl bg-[#0b1220] border border-[#1e293b] p-5">
+            <View className="w-12 h-12 rounded-xl bg-[#3f1d1d] items-center justify-center mb-4 self-center">
+              <Ionicons name="trash-outline" size={26} color="#f87171" />
+            </View>
+            <Text className="text-white text-center text-lg font-bold mb-1">
+              Delete Backup?
+            </Text>
+            <Text className="text-[#94a3b8] text-center text-sm mb-4">
+              This backup will be permanently removed from local storage.
+            </Text>
+            <View className="rounded-xl bg-[#111827] border border-[#1f2937] p-3 mb-4">
+              <Text className="text-[#e2e8f0] text-sm font-semibold">
+                {deleteTarget ? formatBackupDate(deleteTarget.date) : ""}
+              </Text>
+              <Text className="text-[#94a3b8] text-xs mt-1">
+                {deleteTarget ? formatSize(deleteTarget.sizeBytes) : ""}
+              </Text>
+            </View>
+            <View className="flex-row gap-3">
+              <Pressable
+                disabled={isDeleting}
+                onPress={() => setDeleteTarget(null)}
+                className="flex-1 rounded-xl bg-[#1f2937] border border-[#334155] py-3 active:opacity-80 disabled:opacity-50"
+              >
+                <Text className="text-[#e2e8f0] text-center font-semibold">
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                disabled={isDeleting}
+                onPress={confirmDelete}
+                className="flex-1 rounded-xl bg-[#ef4444] py-3 active:opacity-80 disabled:opacity-50"
+              >
+                <Text className="text-white text-center font-bold">
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-[#1e293b]">
         <Pressable
           onPress={() => router.back()}
