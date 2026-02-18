@@ -133,6 +133,19 @@ export default function HistoryScreen() {
   const [caseId, setCaseId] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<SelectedVcf[]>([]);
   const [isUploadingVcf, setIsUploadingVcf] = useState(false);
+  const [uploadSuccessModal, setUploadSuccessModal] = useState<{
+    visible: boolean;
+    message: string;
+    summary: {
+      totalContacts: number;
+      newContacts: number;
+      existingContacts: number;
+    } | null;
+  }>({
+    visible: false,
+    message: "",
+    summary: null,
+  });
 
   useEffect(() => {
     if (params.tab === "cloud") {
@@ -349,15 +362,12 @@ export default function HistoryScreen() {
         throw new Error(json.message || "Failed to upload VCF files");
       }
 
-      const summary = json.data?.summary;
-      const summaryText = summary
-        ? `\nTotal: ${summary.totalContacts}\nNew: ${summary.newContacts}\nExisting: ${summary.existingContacts}`
-        : "";
-
-      Alert.alert(
-        "Upload completed",
-        `${json.message || "VCF analysis completed"}${summaryText}`,
-      );
+      const summary = json.data?.summary ?? null;
+      setUploadSuccessModal({
+        visible: true,
+        message: json.message || "VCF analysis completed",
+        summary,
+      });
       setUploadModalVisible(false);
       setUploadName("");
       setCaseId("");
@@ -522,6 +532,53 @@ export default function HistoryScreen() {
               <Text className="text-[#94a3b8] text-center font-semibold">
                 Cancel
               </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={uploadSuccessModal.visible}
+        onRequestClose={() =>
+          setUploadSuccessModal((prev) => ({ ...prev, visible: false }))
+        }
+      >
+        <View className="flex-1 bg-black/70 items-center justify-center px-6">
+          <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#0b1224] p-5">
+            <View className="w-14 h-14 rounded-2xl bg-[#14324d] items-center justify-center mb-4 self-center">
+              <Ionicons name="checkmark-done" size={30} color="#22d3ee" />
+            </View>
+            <Text className="text-white text-center text-xl font-bold">
+              Upload Completed
+            </Text>
+            <Text className="text-[#94a3b8] text-center text-sm mt-1 mb-4">
+              {uploadSuccessModal.message}
+            </Text>
+
+            {uploadSuccessModal.summary ? (
+              <View className="rounded-2xl border border-[#1f2937] bg-[#111827] p-3 mb-4">
+                <Text className="text-[#cbd5e1] text-sm">
+                  Total Contacts: {uploadSuccessModal.summary.totalContacts}
+                </Text>
+                <Text className="text-[#86efac] text-sm mt-1">
+                  New Contacts: {uploadSuccessModal.summary.newContacts}
+                </Text>
+                <Text className="text-[#93c5fd] text-sm mt-1">
+                  Existing Contacts:{" "}
+                  {uploadSuccessModal.summary.existingContacts}
+                </Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={() =>
+                setUploadSuccessModal((prev) => ({ ...prev, visible: false }))
+              }
+              className="rounded-xl bg-[#2563eb] py-3 active:opacity-80"
+            >
+              <Text className="text-white text-center font-bold">Done</Text>
             </Pressable>
           </View>
         </View>

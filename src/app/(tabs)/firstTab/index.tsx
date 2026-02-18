@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, Text, TextInput, View } from "react-native";
+import { Alert, Modal, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -20,6 +20,15 @@ export default function FirstTab() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [message, setMessage] = useState("");
   const [token, setToken] = useState("");
+  const [loginSuccessModal, setLoginSuccessModal] = useState<{
+    visible: boolean;
+    message: string;
+    redirectPath: string;
+  }>({
+    visible: false,
+    message: "",
+    redirectPath: "",
+  });
   const [userData, setUserData] = useState<{
     name: string;
     mobileNumber: string;
@@ -137,7 +146,6 @@ export default function FirstTab() {
         token: response.data.token,
         user: response.data.user,
       });
-      Alert.alert("Success", response.message || "OTP verified successfully");
       const query = new URLSearchParams({
         tab: "cloud",
         name: response.data.user.name,
@@ -146,7 +154,11 @@ export default function FirstTab() {
         active: String(response.data.user.active),
         token: response.data.token,
       }).toString();
-      router.replace(`/history?${query}`);
+      setLoginSuccessModal({
+        visible: true,
+        message: response.message || "OTP verified successfully",
+        redirectPath: `/history?${query}`,
+      });
     } catch (error) {
       console.error("Error verifying OTP:", error);
       Alert.alert("Verification failed", "Failed to verify OTP");
@@ -169,6 +181,49 @@ export default function FirstTab() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#050a17]" edges={["top", "bottom"]}>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={loginSuccessModal.visible}
+        onRequestClose={() =>
+          setLoginSuccessModal((prev) => ({ ...prev, visible: false }))
+        }
+      >
+        <View className="flex-1 bg-black/70 items-center justify-center px-6">
+          <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#0b1224] p-5">
+            <View className="w-14 h-14 rounded-2xl bg-[#14324d] items-center justify-center mb-4 self-center">
+              <Ionicons name="checkmark-done" size={30} color="#22d3ee" />
+            </View>
+            <Text className="text-white text-center text-xl font-bold">
+              Login Successful
+            </Text>
+            <Text className="text-[#94a3b8] text-center text-sm mt-1 mb-4">
+              {loginSuccessModal.message}
+            </Text>
+            {userData ? (
+              <View className="rounded-2xl border border-[#1f2937] bg-[#111827] p-3 mb-4">
+                <Text className="text-[#cbd5e1] text-sm">
+                  Name: {userData.name}
+                </Text>
+                <Text className="text-[#93c5fd] text-sm mt-1">
+                  Mobile: {userData.mobileNumber}
+                </Text>
+              </View>
+            ) : null}
+            <Pressable
+              onPress={() => {
+                const next = loginSuccessModal.redirectPath;
+                setLoginSuccessModal((prev) => ({ ...prev, visible: false }));
+                if (next) router.replace(next);
+              }}
+              className="rounded-xl bg-[#2563eb] py-3 active:opacity-80"
+            >
+              <Text className="text-white text-center font-bold">Continue</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <View className="absolute -top-24 -left-20 w-72 h-72 rounded-full bg-[#0d2a4d]/50" />
       <View className="absolute bottom-24 -right-24 w-72 h-72 rounded-full bg-[#0f3a37]/40" />
 
