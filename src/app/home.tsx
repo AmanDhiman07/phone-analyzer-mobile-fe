@@ -31,6 +31,8 @@ function BackupCard({
   onBackup,
   onRestore,
   loading,
+  accentBg,
+  accentText,
 }: {
   icon: "people" | "chatbubbles" | "call";
   label: string;
@@ -38,36 +40,47 @@ function BackupCard({
   onBackup: () => void;
   onRestore: () => void;
   loading: boolean;
+  accentBg: string;
+  accentText: string;
 }) {
   return (
-    <View className="bg-[#1e293b] rounded-xl p-4 mb-4">
-      <View className="flex-row items-center mb-3">
-        <View className="w-10 h-10 rounded-lg bg-[#1e3a5f] items-center justify-center mr-3">
-          <Ionicons name={icon} size={22} color="#38bdf8" />
+    <View className="rounded-3xl border border-[#1f2937] bg-[#0f1729] p-4 mb-4">
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-row items-center flex-1">
+          <View
+            className={`w-11 h-11 rounded-2xl items-center justify-center mr-3 ${accentBg}`}
+          >
+            <Ionicons name={icon} size={22} color={accentText} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-white text-base font-bold">{label}</Text>
+            <Text className="text-[#9ca3af] text-xs mt-0.5">
+              {loading
+                ? "Updating..."
+                : count !== null
+                  ? `${count.toLocaleString()} records found`
+                  : "No data loaded"}
+            </Text>
+          </View>
         </View>
-        <Text className="text-white font-medium text-base">{label}</Text>
       </View>
-      <Text className="text-[#94a3b8] text-sm mb-3">
-        {loading
-          ? "…"
-          : count !== null
-            ? `${count.toLocaleString()} found`
-            : "—"}
-      </Text>
+
       <View className="flex-row gap-3">
         <Pressable
           onPress={onBackup}
           disabled={loading}
-          className="flex-1 py-2.5 rounded-lg bg-[#2563eb] active:opacity-80 disabled:opacity-50"
+          className="flex-1 rounded-xl bg-[#0ea5e9] py-3 active:opacity-80 disabled:opacity-50"
         >
-          <Text className="text-white text-center font-semibold">Backup</Text>
+          <Text className="text-[#031324] text-center font-bold">Backup</Text>
         </Pressable>
         <Pressable
           onPress={onRestore}
           disabled={loading}
-          className="flex-1 py-2.5 rounded-lg bg-[#2563eb] active:opacity-80 disabled:opacity-50"
+          className="flex-1 rounded-xl border border-[#334155] bg-[#111827] py-3 active:opacity-80 disabled:opacity-50"
         >
-          <Text className="text-white text-center font-semibold">Restore</Text>
+          <Text className="text-[#e5e7eb] text-center font-semibold">
+            Restore
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -112,7 +125,6 @@ export default function HomeScreen() {
   }, [successModal.path]);
 
   const loadCounts = useCallback(async () => {
-    // Request permissions one after the other so both dialogs can be shown and granted
     const c = await getContactsCount();
     setContactsCount(c);
     const m = await getMessagesCount();
@@ -194,7 +206,7 @@ export default function HomeScreen() {
     setLoading(true);
     try {
       const { path, count } = await backupCallLogs();
-      showBackupSuccess("Call logs", count, path);
+      showBackupSuccess("Call Logs", count, path);
       await loadCounts();
     } catch (e) {
       Alert.alert("Backup failed", String(e));
@@ -213,7 +225,7 @@ export default function HomeScreen() {
   const backupPath = getBackupRootPath();
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0f172a]" edges={["top", "bottom"]}>
+    <SafeAreaView className="flex-1 bg-[#050a17]" edges={["top", "bottom"]}>
       <Modal
         transparent
         animationType="fade"
@@ -222,18 +234,18 @@ export default function HomeScreen() {
           setSuccessModal((prev) => ({ ...prev, visible: false }))
         }
       >
-        <View className="flex-1 bg-black/60 items-center justify-center px-6">
-          <View className="w-full max-w-[360px] rounded-2xl bg-[#0b1220] border border-[#1e293b] p-5">
-            <View className="w-12 h-12 rounded-xl bg-[#052e3b] items-center justify-center mb-4 self-center">
-              <Ionicons name="checkmark-circle" size={28} color="#22d3ee" />
+        <View className="flex-1 bg-black/70 items-center justify-center px-6">
+          <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#070d1d] p-5">
+            <View className="w-14 h-14 rounded-2xl bg-[#123347] items-center justify-center mb-4 self-center">
+              <Ionicons name="checkmark-done" size={30} color="#22d3ee" />
             </View>
-            <Text className="text-white text-center text-lg font-bold mb-1">
+            <Text className="text-white text-center text-lg font-bold">
               {successModal.label} Backup Complete
             </Text>
-            <Text className="text-[#94a3b8] text-center text-sm mb-4">
-              {successModal.count.toLocaleString()} items saved successfully
+            <Text className="text-[#9ca3af] text-center text-sm mt-1 mb-4">
+              {successModal.count.toLocaleString()} items saved
             </Text>
-            <View className="rounded-xl bg-[#111827] border border-[#1f2937] p-3 mb-4">
+            <View className="rounded-2xl border border-[#1f2937] bg-[#0f172a] p-3 mb-4">
               <Text className="text-[#64748b] text-[11px] uppercase tracking-wider mb-1">
                 Location
               </Text>
@@ -244,9 +256,9 @@ export default function HomeScreen() {
             <View className="flex-row gap-3">
               <Pressable
                 onPress={handleCopyPath}
-                className="flex-1 rounded-xl bg-[#1f2937] border border-[#334155] py-3 active:opacity-80"
+                className="flex-1 rounded-xl border border-[#334155] bg-[#111827] py-3 active:opacity-80"
               >
-                <Text className="text-[#e2e8f0] text-center font-semibold">
+                <Text className="text-[#e5e7eb] text-center font-semibold">
                   Copy Path
                 </Text>
               </Pressable>
@@ -256,7 +268,7 @@ export default function HomeScreen() {
                 }
                 className="flex-1 rounded-xl bg-[#0ea5e9] py-3 active:opacity-80"
               >
-                <Text className="text-[#0b1220] text-center font-bold">
+                <Text className="text-[#031324] text-center font-bold">
                   Done
                 </Text>
               </Pressable>
@@ -265,27 +277,38 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      <View className="flex-row items-center justify-between px-4 py-3 border-b border-[#1e293b]">
-        <View className="flex-row items-center">
-          <View className="w-9 h-9 rounded-lg bg-[#1e3a5f] items-center justify-center mr-2">
-            <Ionicons name="shield-checkmark" size={20} color="#38bdf8" />
+      <View className="absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[#0d2a4d]/60" />
+      <View className="absolute top-52 -left-24 w-56 h-56 rounded-full bg-[#0f3a37]/40" />
+
+      <View className="px-4 pt-2 pb-4">
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center">
+            <View className="w-11 h-11 rounded-2xl bg-[#102848] items-center justify-center mr-3 border border-[#1e3a5f]">
+              <Ionicons name="shield-checkmark" size={22} color="#38bdf8" />
+            </View>
+            <View>
+              <Text className="text-[#e5e7eb] text-lg font-bold">
+                DataGuard
+              </Text>
+              <Text className="text-[#94a3b8] text-xs">
+                Fast local backup manager
+              </Text>
+            </View>
           </View>
-          <Text className="text-white text-lg font-bold">DataGuard</Text>
+          <Pressable
+            onPress={() => router.push("/history")}
+            className="w-11 h-11 rounded-2xl border border-[#23324a] bg-[#0f1729] items-center justify-center active:opacity-80"
+          >
+            <Ionicons name="archive-outline" size={21} color="#7dd3fc" />
+          </Pressable>
         </View>
-        <Pressable
-          onPress={() => router.push("/history")}
-          className="w-10 h-10 rounded-full bg-[#1e293b] items-center justify-center active:opacity-80"
-        >
-          <Ionicons name="sync" size={22} color="#38bdf8" />
-        </Pressable>
       </View>
 
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
           paddingHorizontal: 16,
-          paddingTop: 16,
-          paddingBottom: 24,
+          paddingBottom: 28,
         }}
         refreshControl={
           <RefreshControl
@@ -295,13 +318,19 @@ export default function HomeScreen() {
           />
         }
       >
-        <View className="mb-2">
-          <Text className="text-[#64748b] text-xs uppercase tracking-wider mb-1">
-            Local Backup Path
+        <View className="rounded-3xl border border-[#1f2937] bg-[#0b1224] p-4 mb-5">
+          <Text className="text-[#cbd5e1] text-sm font-semibold mb-2">
+            Backup Destination
           </Text>
-          <Text className="text-[#38bdf8] text-sm" numberOfLines={2}>
+          <Text className="text-[#38bdf8] text-xs" numberOfLines={2}>
             {backupPath}
           </Text>
+          <View className="flex-row items-center mt-3">
+            <Ionicons name="lock-closed-outline" size={14} color="#94a3b8" />
+            <Text className="text-[#94a3b8] text-xs ml-1.5">
+              Stored only on this device
+            </Text>
+          </View>
         </View>
 
         <BackupCard
@@ -311,6 +340,8 @@ export default function HomeScreen() {
           onBackup={handleBackupContacts}
           onRestore={handleRestoreContacts}
           loading={loading}
+          accentBg="bg-[#132e4f]"
+          accentText="#7dd3fc"
         />
         <BackupCard
           icon="chatbubbles"
@@ -319,6 +350,8 @@ export default function HomeScreen() {
           onBackup={handleBackupMessages}
           onRestore={handleRestoreMessages}
           loading={loading}
+          accentBg="bg-[#10302a]"
+          accentText="#5eead4"
         />
         <BackupCard
           icon="call"
@@ -327,6 +360,8 @@ export default function HomeScreen() {
           onBackup={handleBackupCallLogs}
           onRestore={handleRestoreCallLogs}
           loading={loading}
+          accentBg="bg-[#35280f]"
+          accentText="#fbbf24"
         />
       </ScrollView>
     </SafeAreaView>

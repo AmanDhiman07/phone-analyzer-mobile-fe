@@ -4,16 +4,14 @@ import React from "react";
 import { LogBox } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
-// Suppress SafeAreaView deprecation from react-native-css-interop (NativeWind);
-// we use SafeAreaView from react-native-safe-area-context in our screens.
 LogBox.ignoreLogs([
-  "SafeAreaView has been deprecated",
+  "SafeAreaView has been deprecated and will be removed in a future release.",
 ]);
 
 export default function RootLayout() {
   return (
     <React.Fragment>
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }} />
     </React.Fragment>
   );
