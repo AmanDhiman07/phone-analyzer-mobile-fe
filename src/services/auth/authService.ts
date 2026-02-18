@@ -1,5 +1,3 @@
-import { Platform } from "react-native";
-
 type AuthUser = {
   name: string;
   mobileNumber: string;
@@ -23,8 +21,7 @@ type VerifyOtpResponse = {
 
 const DEFAULT_API_BASE_URL = "http://192.168.68.122:3000/api";
 
-
-function getApiBaseUrl() {
+export function getApiBaseUrl() {
   const value = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
   if (!value) return DEFAULT_API_BASE_URL;
   return value.replace(/\/+$/, "");

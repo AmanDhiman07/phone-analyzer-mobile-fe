@@ -1,8 +1,17 @@
 import { useState, useCallback, useEffect } from "react";
-import { View, Text, Pressable, FlatList, Modal, Alert } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  FlatList,
+  Modal,
+  Alert,
+  TextInput,
+} from "react-native";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { File } from "expo-file-system";
 import {
   listBackups,
   deleteBackup,
@@ -14,6 +23,7 @@ import {
   getAuthSession,
   type AuthSession,
 } from "@/services/auth/sessionStorage";
+import { getApiBaseUrl } from "@/services/auth/authService";
 import type { BackupRecord } from "@/types/backup";
 
 function getBackupPresentation(item: BackupRecord) {
@@ -97,6 +107,11 @@ function BackupListItem({
 }
 
 type HistoryTab = "local" | "cloud";
+type SelectedVcf = {
+  name: string;
+  uri: string;
+  size: number;
+};
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -113,6 +128,11 @@ export default function HistoryScreen() {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BackupRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [uploadName, setUploadName] = useState("");
+  const [caseId, setCaseId] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<SelectedVcf[]>([]);
+  const [isUploadingVcf, setIsUploadingVcf] = useState(false);
 
   useEffect(() => {
     if (params.tab === "cloud") {
@@ -191,8 +211,165 @@ export default function HistoryScreen() {
   }, []);
 
   const handleAddVcf = useCallback(() => {
-    Alert.alert("Add VCF File", "VCF upload flow will be connected next.");
+    setUploadModalVisible(true);
   }, []);
+
+  const handlePickVcfFiles = useCallback(async () => {
+    try {
+      let pickedFiles: SelectedVcf[] = [];
+
+      try {
+        const DocumentPicker = await import("expo-document-picker");
+        const result = await DocumentPicker.getDocumentAsync({
+          type: "*/*",
+          multiple: true,
+          copyToCacheDirectory: true,
+        });
+
+        if (result.canceled) return;
+
+        pickedFiles = result.assets.map((asset) => ({
+          name: asset.name,
+          uri: asset.uri,
+          size: asset.size ?? 0,
+        }));
+      } catch (pickerImportError) {
+        const picked = await File.pickFileAsync();
+        const files = Array.isArray(picked) ? picked : [picked];
+        pickedFiles = files.map((file) => ({
+          name: file.name,
+          uri: file.uri,
+          size: file.size,
+        }));
+
+        if (pickedFiles.length === 0) {
+          throw pickerImportError;
+        }
+      }
+
+      const onlyVcf = pickedFiles.filter((file) =>
+        file.name.toLowerCase().endsWith(".vcf"),
+      );
+
+      if (onlyVcf.length === 0) {
+        Alert.alert("Invalid file", "Please select .vcf files only.");
+        return;
+      }
+
+      setSelectedFiles((prev) => {
+        const dedup = new Map(prev.map((item) => [item.uri, item]));
+        for (const file of onlyVcf) {
+          dedup.set(file.uri, file);
+        }
+        const merged = Array.from(dedup.values());
+        if (merged.length > 20) {
+          Alert.alert("Limit exceeded", "Maximum 20 files are allowed.");
+          return merged.slice(0, 20);
+        }
+        return merged;
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "User canceled") {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Unable to pick VCF files.";
+      Alert.alert("File selection failed", errorMessage);
+    }
+  }, []);
+
+  const handleRemoveSelectedFile = useCallback((uri: string) => {
+    setSelectedFiles((prev) => prev.filter((file) => file.uri !== uri));
+  }, []);
+
+  const handleUploadVcf = useCallback(async () => {
+    if (isUploadingVcf) return;
+
+    if (!session?.token) {
+      Alert.alert("Login required", "Please login to cloud first.");
+      return;
+    }
+
+    if (!uploadName.trim()) {
+      Alert.alert("Name required", "Please enter a backup name.");
+      return;
+    }
+    if (!caseId.trim()) {
+      Alert.alert("Case ID required", "Please enter the case ID.");
+      return;
+    }
+    if (selectedFiles.length === 0) {
+      Alert.alert("No files selected", "Please select one or more VCF files.");
+      return;
+    }
+    if (selectedFiles.length > 20) {
+      Alert.alert("Limit exceeded", "Maximum 20 files are allowed.");
+      return;
+    }
+    if (selectedFiles.some((file) => file.size > 10 * 1024 * 1024)) {
+      Alert.alert("File too large", "Each file must be 10MB or less.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("userName", uploadName.trim());
+    formData.append("caseId", caseId.trim());
+    selectedFiles.forEach((file) => {
+      formData.append("vcfFiles", {
+        uri: file.uri,
+        name: file.name,
+        type: "text/vcard",
+      } as unknown as Blob);
+    });
+
+    setIsUploadingVcf(true);
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/contact/analyze-vcf`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: formData,
+      });
+      const json = (await response.json()) as {
+        statusCode?: number;
+        success?: boolean;
+        message?: string;
+        data?: {
+          caseId?: string;
+          summary?: {
+            totalContacts: number;
+            newContacts: number;
+            existingContacts: number;
+          };
+        };
+      };
+
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Failed to upload VCF files");
+      }
+
+      const summary = json.data?.summary;
+      const summaryText = summary
+        ? `\nTotal: ${summary.totalContacts}\nNew: ${summary.newContacts}\nExisting: ${summary.existingContacts}`
+        : "";
+
+      Alert.alert(
+        "Upload completed",
+        `${json.message || "VCF analysis completed"}${summaryText}`,
+      );
+      setUploadModalVisible(false);
+      setUploadName("");
+      setCaseId("");
+      setSelectedFiles([]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to upload VCF files";
+      Alert.alert("Upload failed", message);
+    } finally {
+      setIsUploadingVcf(false);
+    }
+  }, [caseId, isUploadingVcf, selectedFiles, session?.token, uploadName]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#050a17]" edges={["top", "bottom"]}>
@@ -243,6 +420,109 @@ export default function HistoryScreen() {
                 </Text>
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={uploadModalVisible}
+        onRequestClose={() => setUploadModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/70 items-center justify-center px-6">
+          <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#111c33] p-5">
+            <View className="w-14 h-14 rounded-2xl bg-[#173f85] items-center justify-center mb-4 self-center">
+              <Ionicons name="cloud-upload" size={28} color="#60a5fa" />
+            </View>
+            <Text className="text-white text-center text-2xl font-bold mb-1">
+              Upload to Cloud?
+            </Text>
+            <Text className="text-[#9ca3af] text-center text-sm mb-4">
+              Add details and upload one or more VCF files.
+            </Text>
+
+            <Text className="text-[#94a3b8] text-[11px] font-semibold mb-1 uppercase">
+              Name
+            </Text>
+            <View className="rounded-xl border border-[#23324a] bg-[#0f1729] px-3 mb-3">
+              <TextInput
+                value={uploadName}
+                onChangeText={setUploadName}
+                placeholder="e.g., Work Contacts Oct 2023"
+                placeholderTextColor="#64748b"
+                className="py-3 text-[#e2e8f0]"
+              />
+            </View>
+
+            <Text className="text-[#94a3b8] text-[11px] font-semibold mb-1 uppercase">
+              Case ID
+            </Text>
+            <View className="rounded-xl border border-[#23324a] bg-[#0f1729] px-3 mb-3">
+              <TextInput
+                value={caseId}
+                onChangeText={setCaseId}
+                placeholder="Enter case ID"
+                placeholderTextColor="#64748b"
+                className="py-3 text-[#e2e8f0]"
+              />
+            </View>
+
+            <Pressable
+              onPress={handlePickVcfFiles}
+              disabled={isUploadingVcf}
+              className="rounded-xl border border-[#2c4f88] bg-[#162746] py-3 mb-3 active:opacity-80 disabled:opacity-50"
+            >
+              <Text className="text-[#93c5fd] text-center font-semibold">
+                Add VCF File
+              </Text>
+            </Pressable>
+            <Text className="text-[#64748b] text-[11px] mb-2">
+              Add files one by one. You can upload up to 20 files.
+            </Text>
+
+            {selectedFiles.length > 0 ? (
+              <View className="rounded-xl border border-[#1f2937] bg-[#0b1224] px-3 py-2 mb-3">
+                {selectedFiles.map((file) => (
+                  <View
+                    key={file.uri}
+                    className="flex-row items-center justify-between py-1.5"
+                  >
+                    <Text
+                      numberOfLines={1}
+                      className="text-[#cbd5e1] text-xs flex-1 mr-2"
+                    >
+                      {file.name}
+                    </Text>
+                    <Pressable
+                      onPress={() => handleRemoveSelectedFile(file.uri)}
+                      className="active:opacity-80"
+                    >
+                      <Ionicons name="close-circle" size={18} color="#f87171" />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={handleUploadVcf}
+              disabled={isUploadingVcf}
+              className="rounded-xl bg-[#2563eb] py-3.5 active:opacity-80 disabled:opacity-50"
+            >
+              <Text className="text-white text-center font-bold">
+                {isUploadingVcf ? "Uploading..." : "Upload"}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={isUploadingVcf}
+              onPress={() => setUploadModalVisible(false)}
+              className="py-3.5 mt-1 active:opacity-80 disabled:opacity-50"
+            >
+              <Text className="text-[#94a3b8] text-center font-semibold">
+                Cancel
+              </Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -413,7 +693,7 @@ export default function HistoryScreen() {
                   className="rounded-xl bg-[#2563eb] py-3 active:opacity-80"
                 >
                   <Text className="text-white text-center font-bold">
-                    Add VCF File
+                    Upload VCF to Cloud
                   </Text>
                 </Pressable>
                 <Text className="text-[#64748b] text-xs mt-3 text-center">
