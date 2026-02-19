@@ -1,4 +1,3 @@
-/* eslint-disable import/no-unresolved */
 import * as SecureStore from "expo-secure-store";
 import type { AuthUser } from "./authService";
 
@@ -9,21 +8,70 @@ type AuthSession = {
 
 const AUTH_SESSION_KEY = "auth_session";
 
-function isValidSession(value: unknown): value is AuthSession {
-  if (!value || typeof value !== "object") return false;
-  const maybe = value as Partial<AuthSession>;
-  return (
-    typeof maybe.token === "string" &&
-    !!maybe.user &&
-    typeof maybe.user.name === "string" &&
-    typeof maybe.user.mobileNumber === "string" &&
-    typeof maybe.user.role === "string" &&
-    typeof maybe.user.active === "boolean"
-  );
+function toBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1";
+  }
+  return false;
+}
+
+function normalizeSession(value: unknown): AuthSession | null {
+  if (!value || typeof value !== "object") return null;
+
+  const maybe = value as {
+    token?: unknown;
+    user?: {
+      name?: unknown;
+      mobileNumber?: unknown;
+      mobile?: unknown;
+      phone?: unknown;
+      role?: unknown;
+      active?: unknown;
+    };
+  };
+
+  if (typeof maybe.token !== "string" || maybe.token.trim().length === 0) {
+    return null;
+  }
+
+  const userInput = maybe.user ?? {};
+  const mobile =
+    typeof userInput.mobileNumber === "string"
+      ? userInput.mobileNumber
+      : typeof userInput.mobile === "string"
+        ? userInput.mobile
+        : typeof userInput.phone === "string"
+          ? userInput.phone
+          : "";
+  const name =
+    typeof userInput.name === "string" && userInput.name.trim().length > 0
+      ? userInput.name
+      : "User";
+  const role =
+    typeof userInput.role === "string" && userInput.role.trim().length > 0
+      ? userInput.role
+      : "user";
+
+  const user: AuthUser = {
+    name,
+    mobileNumber: mobile,
+    role,
+    active: toBoolean(userInput.active),
+  };
+
+  return {
+    token: maybe.token.trim(),
+    user,
+  };
 }
 
 export async function saveAuthSession(session: AuthSession) {
-  await SecureStore.setItemAsync(AUTH_SESSION_KEY, JSON.stringify(session));
+  const normalized = normalizeSession(session);
+  if (!normalized) return;
+  await SecureStore.setItemAsync(AUTH_SESSION_KEY, JSON.stringify(normalized));
 }
 
 export async function getAuthSession() {
@@ -32,7 +80,8 @@ export async function getAuthSession() {
 
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (isValidSession(parsed)) return parsed;
+    const session = normalizeSession(parsed);
+    if (session) return session;
     return null;
   } catch {
     return null;

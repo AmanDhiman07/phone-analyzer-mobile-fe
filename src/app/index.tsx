@@ -2,40 +2,18 @@ import { useEffect, useRef } from "react";
 import { View, Text, Animated, Easing } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function SplashScreen() {
   const router = useRouter();
-  const fade = useRef(new Animated.Value(0)).current;
-  const rise = useRef(new Animated.Value(18)).current;
-  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const fade = useRef(new Animated.Value(1)).current;
+  const rise = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(1)).current;
   const pulse = useRef(new Animated.Value(0)).current;
   const spin = useRef(new Animated.Value(0)).current;
   const progress = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const entrance = Animated.parallel([
-      Animated.timing(fade, {
-        toValue: 1,
-        duration: 620,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(rise, {
-        toValue: 0,
-        duration: 620,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(logoScale, {
-        toValue: 1,
-        duration: 680,
-        easing: Easing.out(Easing.back(1.45)),
-        useNativeDriver: true,
-      }),
-    ]);
-
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -78,7 +56,6 @@ export default function SplashScreen() {
       }),
     );
 
-    entrance.start();
     pulseLoop.start();
     spinLoop.start();
     progressAnim.start();
@@ -162,7 +139,55 @@ export default function SplashScreen() {
             style={{ transform: [{ scale: logoScale }] }}
             className="w-28 h-28 rounded-3xl bg-[#0f1729] border border-[#1f2937] items-center justify-center"
           >
-            <Ionicons name="shield-checkmark" size={52} color="#38bdf8" />
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+                backgroundColor: "#123347",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <View
+                style={{
+                  width: 24,
+                  height: 28,
+                  borderWidth: 2,
+                  borderColor: "#38bdf8",
+                  borderTopLeftRadius: 10,
+                  borderTopRightRadius: 10,
+                  borderBottomLeftRadius: 8,
+                  borderBottomRightRadius: 8,
+                  backgroundColor: "#0b1f34",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <View
+                  style={{
+                    width: 8,
+                    height: 2,
+                    backgroundColor: "#38bdf8",
+                    transform: [{ rotate: "45deg" }, { translateY: 1 }],
+                    position: "absolute",
+                    top: 14,
+                    left: 6,
+                  }}
+                />
+                <View
+                  style={{
+                    width: 12,
+                    height: 2,
+                    backgroundColor: "#38bdf8",
+                    transform: [{ rotate: "-45deg" }],
+                    position: "absolute",
+                    top: 12,
+                    left: 10,
+                  }}
+                />
+              </View>
+            </View>
           </Animated.View>
         </View>
         <Text className="text-white text-4xl font-bold tracking-tight mb-1">
