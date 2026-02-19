@@ -7,6 +7,7 @@ export {
   backupMessages,
   backupCallLogs,
   restoreContacts,
+  restoreCallLogs,
   listBackups,
   deleteBackup,
   getBackupRootPath,

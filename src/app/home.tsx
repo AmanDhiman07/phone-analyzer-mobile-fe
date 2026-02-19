@@ -4,6 +4,7 @@ import {
   Text,
   Pressable,
   Alert,
+  AppState,
   Modal,
   Clipboard,
   RefreshControl,
@@ -21,8 +22,15 @@ import {
   backupMessages,
   backupCallLogs,
   restoreContacts,
+  restoreCallLogs,
   listBackups,
 } from "@/services/backup";
+import {
+  isDefaultPhoneApp,
+  isDefaultSmsApp,
+  openDefaultPhoneAppSettings,
+  requestDefaultSmsApp,
+} from "@/services/permissions";
 
 function BackupCard({
   icon,
@@ -164,16 +172,29 @@ export default function HomeScreen() {
       Alert.alert("No backups", "Create a backup first.");
       return;
     }
-    const latest = backups[0];
+    const latestContactsBackup = backups.find(
+      (item) => item.counts.contacts > 0,
+    );
+    if (!latestContactsBackup) {
+      Alert.alert("No contact backups", "No backup with contacts was found.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const restored = await restoreContacts(latest.folderName);
-      Alert.alert(
-        "Restore complete",
-        restored > 0
-          ? `Restored ${restored} contacts.`
-          : "No contacts restored (restore may be iOS-only).",
-      );
+      const result = await restoreContacts(latestContactsBackup.folderName);
+      if (result.restored > 0) {
+        const detail =
+          result.failed > 0 || result.skipped > 0
+            ? `Restored ${result.restored} of ${result.total}. ${result.skipped} skipped and ${result.failed} failed.`
+            : `Restored ${result.restored} contacts.`;
+        Alert.alert("Restore complete", detail);
+      } else {
+        Alert.alert(
+          "Restore complete",
+          `No new contacts restored. ${result.skipped} skipped and ${result.failed} failed.`,
+        );
+      }
       await loadCounts();
     } catch (e) {
       Alert.alert("Restore failed", String(e));
@@ -196,10 +217,58 @@ export default function HomeScreen() {
   }, [loadCounts, showBackupSuccess]);
 
   const handleRestoreMessages = useCallback(() => {
-    Alert.alert(
-      "Messages",
-      "Restore of SMS is not supported on Android (system restriction).",
-    );
+    const run = async (allowPrompt = true) => {
+      const isDefault = await isDefaultSmsApp();
+      if (!isDefault) {
+        if (!allowPrompt) {
+          Alert.alert(
+            "Default SMS app not set",
+            "Please set this app as default SMS app, then continue.",
+          );
+          return;
+        }
+
+        Alert.alert(
+          "Default SMS App Required",
+          "To restore messages, you need to set Data Guard as your default SMS app.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Continue",
+              onPress: () => {
+                const subscription = AppState.addEventListener(
+                  "change",
+                  (state) => {
+                    if (state !== "active") return;
+                    subscription.remove();
+                    run(false).catch((error) => {
+                      Alert.alert("SMS restore failed", String(error));
+                    });
+                  },
+                );
+                requestDefaultSmsApp().catch((error) => {
+                  subscription.remove();
+                  Alert.alert(
+                    "Unable to open SMS default screen",
+                    String(error),
+                  );
+                });
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      Alert.alert(
+        "SMS restore",
+        "Default SMS role granted. SMS write/restore native implementation is the next step.",
+      );
+    };
+
+    run().catch((error) => {
+      Alert.alert("SMS restore failed", String(error));
+    });
   }, []);
 
   const handleBackupCallLogs = useCallback(async () => {
@@ -216,11 +285,82 @@ export default function HomeScreen() {
   }, [loadCounts, showBackupSuccess]);
 
   const handleRestoreCallLogs = useCallback(() => {
-    Alert.alert(
-      "Call logs",
-      "Restore of call logs is not supported on Android (system restriction).",
-    );
-  }, []);
+    const run = async (allowPrompt = true) => {
+      const backups = await listBackups();
+      if (backups.length === 0) {
+        Alert.alert("No backups", "Create a backup first.");
+        return;
+      }
+
+      const latestCallLogBackup = backups.find(
+        (item) => item.counts.callLogs > 0,
+      );
+      if (!latestCallLogBackup) {
+        Alert.alert(
+          "No call log backups",
+          "No backup with call logs was found.",
+        );
+        return;
+      }
+
+      const defaultPhoneApp = await isDefaultPhoneApp();
+      if (!defaultPhoneApp) {
+        if (!allowPrompt) {
+          Alert.alert(
+            "Default app not set",
+            "Please set this app as default Phone app, then try again.",
+          );
+          return;
+        }
+
+        Alert.alert(
+          "Default phone app required",
+          "Set this app as default Phone app to restore call logs.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Set as Default",
+              onPress: () => {
+                const subscription = AppState.addEventListener(
+                  "change",
+                  (state) => {
+                    if (state !== "active") return;
+                    subscription.remove();
+                    run(false).catch((error) => {
+                      Alert.alert("Restore failed", String(error));
+                    });
+                  },
+                );
+                openDefaultPhoneAppSettings().catch((error) => {
+                  subscription.remove();
+                  Alert.alert("Unable to open settings", String(error));
+                });
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const result = await restoreCallLogs(latestCallLogBackup.folderName);
+        Alert.alert(
+          "Restore complete",
+          `Restored ${result.restored} of ${result.total}. ${result.skipped} skipped and ${result.failed} failed.`,
+        );
+        await loadCounts();
+      } catch (error) {
+        Alert.alert("Restore failed", String(error));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    run().catch((error) => {
+      Alert.alert("Restore failed", String(error));
+    });
+  }, [loadCounts]);
 
   const backupPath = getBackupRootPath();
 

@@ -16,6 +16,7 @@ import {
   getSmsList,
   getCallLogList,
 } from "./nativeSmsAndCallLog";
+import { restoreCallLogsNative } from "@/services/permissions";
 
 const getBackupRoot = () =>
   `${FileSystem.documentDirectory}Backups/${BACKUP_FOLDER_NAME}`;
@@ -263,33 +264,172 @@ export async function backupCallLogs(): Promise<{
   return { path: backupDir, count: callLogs.length };
 }
 
-export async function restoreContacts(
-  backupFolderName: string,
-): Promise<number> {
+export async function restoreContacts(backupFolderName: string): Promise<{
+  restored: number;
+  skipped: number;
+  failed: number;
+  total: number;
+}> {
   const backupDir = `${getBackupsDir()}/${backupFolderName}`;
   const contactsPath = `${backupDir}/${CONTACTS_FILE}`;
   const info = await FileSystem.getInfoAsync(contactsPath);
-  if (!info.exists) return 0;
+  if (!info.exists) {
+    throw new Error("Selected backup does not include contacts.");
+  }
 
   const { status } = await Contacts.requestPermissionsAsync();
-  if (status !== "granted") return 0;
+  if (status !== "granted") {
+    throw new Error("Contacts permission denied.");
+  }
 
   const raw = await FileSystem.readAsStringAsync(contactsPath);
-  const contacts: Contacts.Contact[] = JSON.parse(raw);
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("Invalid contacts backup format.");
+  }
+
+  const contacts: Contacts.Contact[] = parsed as Contacts.Contact[];
   let restored = 0;
+  let skipped = 0;
+  let failed = 0;
+
   const addContact = (
     Contacts as { addContactAsync?: (c: Contacts.Contact) => Promise<string> }
   ).addContactAsync;
-  if (!addContact) return 0; // e.g. Android
+  if (!addContact) {
+    throw new Error(
+      "Contact restore is unavailable in this build. Use a development/release build.",
+    );
+  }
+
+  const toText = (value: unknown) =>
+    typeof value === "string" ? value.trim() : "";
+
+  const normalizePhoneNumbers = (value: unknown) => {
+    if (!Array.isArray(value)) return undefined;
+    const items = value
+      .map((entry) => {
+        const raw = entry as { number?: unknown; label?: unknown };
+        const number = toText(raw.number);
+        if (!number) return null;
+        return { number, label: toText(raw.label) || "mobile" };
+      })
+      .filter(Boolean) as { number: string; label: string }[];
+    return items.length > 0 ? items : undefined;
+  };
+
+  const normalizeEmails = (value: unknown) => {
+    if (!Array.isArray(value)) return undefined;
+    const items = value
+      .map((entry) => {
+        const raw = entry as { email?: unknown; label?: unknown };
+        const email = toText(raw.email);
+        if (!email) return null;
+        return { email, label: toText(raw.label) || "work" };
+      })
+      .filter(Boolean) as { email: string; label: string }[];
+    return items.length > 0 ? items : undefined;
+  };
+
+  const toRestorableContact = (source: Contacts.Contact): Contacts.Contact => {
+    const firstName = toText(source.firstName);
+    const lastName = toText(source.lastName);
+    const rawName = toText(source.name) || `${firstName} ${lastName}`.trim();
+    const name = rawName || "Unknown";
+    const phoneNumbers = normalizePhoneNumbers(source.phoneNumbers);
+    const emails = normalizeEmails(source.emails);
+
+    const payload: Contacts.Contact = {
+      contactType: Contacts.ContactTypes.Person,
+      name,
+    };
+
+    if (firstName) payload.firstName = firstName;
+    if (lastName) payload.lastName = lastName;
+    if (phoneNumbers?.length) payload.phoneNumbers = phoneNumbers;
+    if (emails?.length) payload.emails = emails;
+
+    return payload;
+  };
+
+  const existing = await Contacts.getContactsAsync({
+    fields: [
+      Contacts.Fields.Name,
+      Contacts.Fields.PhoneNumbers,
+      Contacts.Fields.Emails,
+    ],
+  });
+  const existingKeys = new Set<string>();
+  for (const c of existing.data) {
+    const key = `${toText(c.name).toLowerCase()}|${normalizePhoneNumbers(c.phoneNumbers)?.[0]?.number ?? ""}|${normalizeEmails(c.emails)?.[0]?.email?.toLowerCase() ?? ""}`;
+    existingKeys.add(key);
+  }
+
   for (const c of contacts) {
     try {
-      await addContact(c);
+      const payload = toRestorableContact(c);
+      const key = `${toText(payload.name).toLowerCase()}|${payload.phoneNumbers?.[0]?.number ?? ""}|${payload.emails?.[0]?.email?.toLowerCase() ?? ""}`;
+      const hasIdentity =
+        !!toText(payload.name) ||
+        !!payload.phoneNumbers?.length ||
+        !!payload.emails?.length;
+
+      if (!hasIdentity || existingKeys.has(key)) {
+        skipped++;
+        continue;
+      }
+
+      await addContact(payload);
+      existingKeys.add(key);
       restored++;
-    } catch {
-      // skip duplicates or errors
+    } catch (error) {
+      failed++;
+      if (failed <= 3) {
+        console.warn("Failed to restore contact:", c.name, error);
+      }
     }
   }
-  return restored;
+
+  return {
+    restored,
+    skipped,
+    failed,
+    total: contacts.length,
+  };
+}
+
+export async function restoreCallLogs(backupFolderName: string): Promise<{
+  restored: number;
+  skipped: number;
+  failed: number;
+  total: number;
+}> {
+  if (Platform.OS !== "android") {
+    throw new Error("Call log restore is supported on Android only.");
+  }
+
+  const backupDir = `${getBackupsDir()}/${backupFolderName}`;
+  const callLogsPath = `${backupDir}/${CALL_LOGS_FILE}`;
+  const info = await FileSystem.getInfoAsync(callLogsPath);
+  if (!info.exists) {
+    throw new Error("Selected backup does not include call logs.");
+  }
+
+  const permission =
+    PermissionsAndroid.PERMISSIONS.WRITE_CALL_LOG ??
+    "android.permission.WRITE_CALL_LOG";
+  const writeGranted = await PermissionsAndroid.request(permission);
+  if (writeGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+    throw new Error("WRITE_CALL_LOG permission denied.");
+  }
+
+  const raw = await FileSystem.readAsStringAsync(callLogsPath);
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("Invalid call logs backup format.");
+  }
+
+  return restoreCallLogsNative(parsed);
 }
 
 export async function listBackups(): Promise<BackupRecord[]> {
