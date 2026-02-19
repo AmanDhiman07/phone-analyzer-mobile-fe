@@ -1,12 +1,14 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
   Pressable,
   FlatList,
+  ScrollView,
   Modal,
   Alert,
   TextInput,
+  PanResponder,
 } from "react-native";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -126,6 +128,7 @@ export default function HistoryScreen() {
   const [activeTab, setActiveTab] = useState<HistoryTab>("local");
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BackupRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
@@ -214,6 +217,7 @@ export default function HistoryScreen() {
   }, [deleteTarget, loadBackups]);
 
   const handleCloudLogin = useCallback(() => {
+    setSidebarVisible(false);
     router.push("/(tabs)/firstTab");
   }, [router]);
 
@@ -221,6 +225,7 @@ export default function HistoryScreen() {
     await clearAuthSession();
     setSession(null);
     setActiveTab("local");
+    setSidebarVisible(false);
   }, []);
 
   const handleAddVcf = useCallback(() => {
@@ -381,8 +386,233 @@ export default function HistoryScreen() {
     }
   }, [caseId, isUploadingVcf, selectedFiles, session?.token, uploadName]);
 
+  const sidebarPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          const isHorizontalSwipe = Math.abs(gestureState.dx) > 6;
+          const isMostlyHorizontal =
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+          return isHorizontalSwipe && isMostlyHorizontal;
+        },
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const isHorizontalSwipe = Math.abs(gestureState.dx) > 6;
+          const isMostlyHorizontal =
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+          return isHorizontalSwipe && isMostlyHorizontal;
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (gestureState.dx < -36) {
+            setSidebarVisible(false);
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const isLeftSwipe = gestureState.dx < -20;
+          const hasSwipeVelocity = gestureState.vx < -0.12;
+          if (isLeftSwipe || hasSwipeVelocity) {
+            setSidebarVisible(false);
+          }
+        },
+      }),
+    [],
+  );
+
+  const sidebarRecentBackups = useMemo(() => backups.slice(0, 3), [backups]);
+
   return (
     <SafeAreaView className="flex-1 bg-[#050a17]" edges={["top", "bottom"]}>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={sidebarVisible}
+        onRequestClose={() => setSidebarVisible(false)}
+      >
+        <View className="flex-1">
+          <Pressable
+            className="flex-1 bg-black/60"
+            onPress={() => setSidebarVisible(false)}
+          />
+          <View
+            {...sidebarPanResponder.panHandlers}
+            className="absolute left-0 top-0 bottom-0 w-[84%] max-w-[330px] border-r border-[#1f2e42] bg-[#0b1224] px-4 pt-14 pb-6 rounded-r-3xl"
+          >
+            <View className="absolute -top-14 -left-8 w-40 h-40 rounded-full bg-[#12385e]/40" />
+            <View className="absolute top-32 -right-10 w-28 h-28 rounded-full bg-[#173852]/35" />
+            <ScrollView
+              {...sidebarPanResponder.panHandlers}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 12 }}
+            >
+              <View className="flex-row items-center justify-between mb-3">
+                <Pressable
+                  onPress={() => setSidebarVisible(false)}
+                  className="w-9 h-9 rounded-xl border border-[#23324a] bg-[#0f1729] items-center justify-center active:opacity-80"
+                >
+                  <Ionicons name="chevron-back" size={20} color="#e2e8f0" />
+                </Pressable>
+                <Text className="text-white text-xl font-bold">History</Text>
+                <View className="w-9 h-9" />
+              </View>
+
+              {session ? (
+                <View className="rounded-2xl border border-[#1f2937] bg-[#111a2b] p-4 mb-4">
+                  <View className="flex-row items-center">
+                    <View className="w-11 h-11 rounded-full bg-[#0d2d2c] items-center justify-center mr-3">
+                      <Ionicons
+                        name="person-circle-outline"
+                        size={22}
+                        color="#22c55e"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[#e2e8f0] text-base font-semibold">
+                        {session.user.name}
+                      </Text>
+                      <Text className="text-[#94a3b8] text-xs mt-0.5">
+                        {session.user.mobileNumber || "Mobile not available"}
+                      </Text>
+                      <Pressable onPress={handleSignOut} className="mt-1.5">
+                        <Text className="text-[#22c55e] text-xs font-semibold">
+                          SIGN OUT
+                        </Text>
+                      </Pressable>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color="#64748b"
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View className="rounded-2xl border border-[#1f2937] bg-[#111a2b] p-4 mb-4">
+                  <View className="flex-row items-center">
+                    <View className="w-11 h-11 rounded-full bg-[#132e4f] items-center justify-center mr-3">
+                      <Ionicons
+                        name="cloud-outline"
+                        size={21}
+                        color="#7dd3fc"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[#e2e8f0] text-sm font-semibold">
+                        Cloud Access
+                      </Text>
+                      <Text className="text-[#94a3b8] text-xs mt-0.5">
+                        Login to use cloud backups
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={handleCloudLogin}
+                      className="active:opacity-80"
+                    >
+                      <Text className="text-[#38bdf8] text-xs font-semibold">
+                        LOGIN
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              <View className="rounded-2xl border border-[#2a384d] bg-[#0f1f3b] p-1 mb-4 flex-row">
+                <Pressable
+                  onPress={() => {
+                    setSidebarVisible(false);
+                    setActiveTab("local");
+                  }}
+                  className={`flex-1 rounded-xl py-2.5 ${activeTab === "local" ? "bg-[#334155]" : ""}`}
+                >
+                  <Text
+                    className={`text-center text-sm font-semibold ${activeTab === "local" ? "text-[#22c55e]" : "text-[#94a3b8]"}`}
+                  >
+                    Local Backups
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setSidebarVisible(false);
+                    setActiveTab("cloud");
+                  }}
+                  className={`flex-1 rounded-xl py-2.5 ${activeTab === "cloud" ? "bg-[#334155]" : ""}`}
+                >
+                  <Text
+                    className={`text-center text-sm font-semibold ${activeTab === "cloud" ? "text-[#e2e8f0]" : "text-[#94a3b8]"}`}
+                  >
+                    Cloud Backups
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-[#e2e8f0] text-[25px] font-bold">
+                  Recent Backups
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setSidebarVisible(false);
+                    setActiveTab("local");
+                  }}
+                >
+                  <Text className="text-[#22c55e] text-xs font-semibold">
+                    View All
+                  </Text>
+                </Pressable>
+              </View>
+
+              {sidebarRecentBackups.length === 0 ? (
+                <View className="rounded-2xl border border-dashed border-[#334155] bg-[#0f1729] px-4 py-8 items-center">
+                  <Ionicons name="archive-outline" size={24} color="#64748b" />
+                  <Text className="text-[#94a3b8] text-xs mt-2">
+                    No backups yet
+                  </Text>
+                </View>
+              ) : (
+                sidebarRecentBackups.map((item) => {
+                  const data = getBackupPresentation(item);
+                  return (
+                    <View
+                      key={item.folderName}
+                      className="rounded-2xl border border-[#1f2937] bg-[#0f1729] p-3 mb-3"
+                    >
+                      <View className="flex-row items-center">
+                        <View
+                          className={`w-11 h-11 rounded-xl items-center justify-center mr-3 ${data.accentBg}`}
+                        >
+                          <Ionicons
+                            name={data.iconName}
+                            size={20}
+                            color={data.accentText}
+                          />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-[#e2e8f0] text-base font-semibold">
+                            {data.title}
+                          </Text>
+                          <Text className="text-[#94a3b8] text-xs mt-0.5">
+                            {formatBackupDate(item.date)} •{" "}
+                            {formatSize(item.sizeBytes)}
+                          </Text>
+                        </View>
+                        <Pressable
+                          onPress={() => handleDelete(item)}
+                          className="w-9 h-9 rounded-full bg-[#12253f] items-center justify-center active:opacity-80"
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={16}
+                            color="#f87171"
+                          />
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         transparent
         animationType="fade"
@@ -589,10 +819,10 @@ export default function HistoryScreen() {
       <View className="px-4 pt-2 pb-4 border-b border-[#1e293b]">
         <View className="flex-row items-center justify-between">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => setSidebarVisible(true)}
             className="w-11 h-11 rounded-2xl border border-[#23324a] bg-[#0f1729] items-center justify-center active:opacity-80"
           >
-            <Ionicons name="arrow-back" size={21} color="#e2e8f0" />
+            <Ionicons name="menu" size={21} color="#e2e8f0" />
           </Pressable>
           <Text className="text-white text-lg font-bold">History</Text>
           <Pressable
@@ -605,76 +835,82 @@ export default function HistoryScreen() {
             <Ionicons name="refresh-outline" size={21} color="#7dd3fc" />
           </Pressable>
         </View>
+        <Text className="text-[#94a3b8] text-xs mt-2">
+          {activeTab === "local"
+            ? "Manage device backups stored on this phone"
+            : "Upload and manage cloud VCF backups"}
+        </Text>
       </View>
 
       <View className="flex-1 px-4 pt-4">
-        {session ? (
-          <View className="rounded-2xl border border-[#1f2937] bg-[#0b1224] px-4 py-4 mb-4">
-            <View className="flex-row items-center">
-              <View className="w-11 h-11 rounded-xl bg-[#10302a] items-center justify-center mr-3">
-                <Ionicons name="person-outline" size={21} color="#5eead4" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[#e2e8f0] text-base font-semibold">
-                  {session.user.name}
-                </Text>
-                <Text className="text-[#94a3b8] text-xs mt-0.5">
-                  {session.user.mobileNumber}
-                </Text>
-              </View>
-              <Pressable onPress={handleSignOut} className="active:opacity-80">
-                <Text className="text-[#22c55e] text-xs font-semibold">
-                  SIGN OUT
+        <View className="rounded-2xl border border-[#1f2937] bg-[#0b1224] px-4 py-3 mb-4">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-[#e2e8f0] text-sm font-semibold">
+                {session
+                  ? `Logged in as ${session.user.name}`
+                  : "Not logged in"}
+              </Text>
+              <Text className="text-[#94a3b8] text-xs mt-1">
+                {session
+                  ? "Cloud backup is ready to use."
+                  : "Login is required for cloud uploads."}
+              </Text>
+            </View>
+            {session ? (
+              <Pressable
+                onPress={handleSignOut}
+                className="rounded-xl bg-[#ef4444] px-3 py-2 active:opacity-80"
+              >
+                <Text className="text-white text-xs font-semibold">
+                  Sign Out
                 </Text>
               </Pressable>
-            </View>
+            ) : (
+              <Pressable
+                onPress={handleCloudLogin}
+                className="rounded-xl bg-[#2563eb] px-3 py-2 active:opacity-80"
+              >
+                <Text className="text-white text-xs font-semibold">Login</Text>
+              </Pressable>
+            )}
           </View>
-        ) : (
-          <View className="rounded-2xl border border-[#1f2937] bg-[#0b1224] px-4 py-4 mb-4">
-            <View className="flex-row items-center mb-3">
-              <View className="w-11 h-11 rounded-xl bg-[#132e4f] items-center justify-center mr-3">
-                <Ionicons name="cloud-outline" size={22} color="#7dd3fc" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[#e2e8f0] text-sm font-semibold">
-                  Cloud Access
-                </Text>
-                <Text className="text-[#94a3b8] text-xs mt-0.5">
-                  Login to your organization account for cloud backups.
-                </Text>
-              </View>
-            </View>
-            <Pressable
-              onPress={handleCloudLogin}
-              className="rounded-xl bg-[#0ea5e9] py-3 active:opacity-80"
-            >
-              <Text className="text-[#031324] text-center font-bold">
-                Login to Cloud
-              </Text>
-            </Pressable>
-          </View>
-        )}
+        </View>
 
         <View className="rounded-2xl border border-[#2a384d] bg-[#0b1224] p-1 mb-4 flex-row">
           <Pressable
             onPress={() => setActiveTab("local")}
-            className={`flex-1 rounded-xl py-2.5 ${activeTab === "local" ? "bg-[#334155]" : ""}`}
+            className={`flex-1 rounded-xl py-2.5 px-2 ${activeTab === "local" ? "bg-[#334155]" : ""}`}
           >
-            <Text
-              className={`text-center text-sm font-semibold ${activeTab === "local" ? "text-[#cbd5e1]" : "text-[#64748b]"}`}
-            >
-              Local Backups
-            </Text>
+            <View className="flex-row items-center justify-center">
+              <Ionicons
+                name="phone-portrait-outline"
+                size={15}
+                color={activeTab === "local" ? "#cbd5e1" : "#64748b"}
+              />
+              <Text
+                className={`ml-1.5 text-center text-sm font-semibold ${activeTab === "local" ? "text-[#cbd5e1]" : "text-[#64748b]"}`}
+              >
+                Local
+              </Text>
+            </View>
           </Pressable>
           <Pressable
             onPress={() => setActiveTab("cloud")}
-            className={`flex-1 rounded-xl py-2.5 ${activeTab === "cloud" ? "bg-[#334155]" : ""}`}
+            className={`flex-1 rounded-xl py-2.5 px-2 ${activeTab === "cloud" ? "bg-[#334155]" : ""}`}
           >
-            <Text
-              className={`text-center text-sm font-semibold ${activeTab === "cloud" ? "text-[#cbd5e1]" : "text-[#64748b]"}`}
-            >
-              Cloud Backups
-            </Text>
+            <View className="flex-row items-center justify-center">
+              <Ionicons
+                name="cloud-outline"
+                size={15}
+                color={activeTab === "cloud" ? "#cbd5e1" : "#64748b"}
+              />
+              <Text
+                className={`ml-1.5 text-center text-sm font-semibold ${activeTab === "cloud" ? "text-[#cbd5e1]" : "text-[#64748b]"}`}
+              >
+                Cloud
+              </Text>
+            </View>
           </Pressable>
         </View>
 
@@ -698,6 +934,14 @@ export default function HistoryScreen() {
                 <Text className="text-[#94a3b8] text-xs mt-1">
                   Create one from the Home screen.
                 </Text>
+                <Pressable
+                  onPress={() => router.push("/home")}
+                  className="mt-4 rounded-xl bg-[#2563eb] px-4 py-2.5 active:opacity-80"
+                >
+                  <Text className="text-white text-xs font-semibold">
+                    Go to Home
+                  </Text>
+                </Pressable>
               </View>
             ) : (
               <FlatList
@@ -733,28 +977,36 @@ export default function HistoryScreen() {
                 </Text>
               </View>
             </View>
+            <View className="rounded-xl border border-[#223044] bg-[#0f1729] px-3 py-3 mb-3">
+              <Text className="text-[#cbd5e1] text-xs font-semibold">
+                Quick Steps
+              </Text>
+              <Text className="text-[#94a3b8] text-xs mt-1">
+                1. Login to cloud 2. Tap upload 3. Select VCF files
+              </Text>
+            </View>
 
             {!session ? (
               <Pressable
                 onPress={handleCloudLogin}
-                className="rounded-xl bg-[#2563eb] py-3 active:opacity-80"
+                className="rounded-xl bg-[#2563eb] py-3.5 active:opacity-80"
               >
                 <Text className="text-white text-center font-bold">
-                  Login to Continue
+                  Login to Cloud
                 </Text>
               </Pressable>
             ) : (
               <>
                 <Pressable
                   onPress={handleAddVcf}
-                  className="rounded-xl bg-[#2563eb] py-3 active:opacity-80"
+                  className="rounded-xl bg-[#2563eb] py-3.5 active:opacity-80"
                 >
                   <Text className="text-white text-center font-bold">
                     Upload VCF to Cloud
                   </Text>
                 </Pressable>
                 <Text className="text-[#64748b] text-xs mt-3 text-center">
-                  Cloud backup list will appear here.
+                  You are ready to upload VCF files.
                 </Text>
               </>
             )}
