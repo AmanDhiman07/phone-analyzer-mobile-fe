@@ -153,6 +153,21 @@ export default function HistoryScreen() {
     setUploadModalVisible(true);
   }, []);
 
+  const isVcfFile = useCallback((file: SelectedVcf) => {
+    const name = file.name.toLowerCase();
+    const uri = file.uri.toLowerCase();
+    const mime = (file.mimeType ?? "").toLowerCase();
+
+    const byExtension = name.endsWith(".vcf") || uri.includes(".vcf");
+    const byMime =
+      mime.includes("vcard") ||
+      mime.includes("x-vcard") ||
+      mime.includes("x-vcf") ||
+      mime.includes("vcf");
+
+    return byExtension || byMime;
+  }, []);
+
   const handlePickVcfFiles = useCallback(async () => {
     try {
       let pickedFiles: SelectedVcf[] = [];
@@ -160,7 +175,7 @@ export default function HistoryScreen() {
       try {
         const DocumentPicker = await import("expo-document-picker");
         const result = await DocumentPicker.getDocumentAsync({
-          type: "*/*",
+          type: ["text/vcard", "text/x-vcard", "application/vcf", "*/*"],
           multiple: true,
           copyToCacheDirectory: true,
         });
@@ -171,14 +186,16 @@ export default function HistoryScreen() {
           name: asset.name,
           uri: asset.uri,
           size: asset.size ?? 0,
+          mimeType: asset.mimeType,
         }));
       } catch (pickerImportError) {
         const picked = await File.pickFileAsync();
         const files = Array.isArray(picked) ? picked : [picked];
-        pickedFiles = files.map((file) => ({
+        pickedFiles = files.map((file: any) => ({
           name: file.name,
           uri: file.uri,
           size: file.size,
+          mimeType: file.mimeType ?? file.type,
         }));
 
         if (pickedFiles.length === 0) {
@@ -186,12 +203,13 @@ export default function HistoryScreen() {
         }
       }
 
-      const onlyVcf = pickedFiles.filter((file) =>
-        file.name.toLowerCase().endsWith(".vcf"),
-      );
+      const onlyVcf = pickedFiles.filter(isVcfFile);
 
       if (onlyVcf.length === 0) {
-        Alert.alert("Invalid file", "Please select .vcf files only.");
+        Alert.alert(
+          "Invalid file",
+          "Please select VCF contact files (.vcf / text-vcard).",
+        );
         return;
       }
 
@@ -215,7 +233,7 @@ export default function HistoryScreen() {
         error instanceof Error ? error.message : "Unable to pick VCF files.";
       Alert.alert("File selection failed", errorMessage);
     }
-  }, []);
+  }, [isVcfFile]);
 
   const handleRemoveSelectedFile = useCallback((uri: string) => {
     setSelectedFiles((prev) => prev.filter((file) => file.uri !== uri));
@@ -257,7 +275,7 @@ export default function HistoryScreen() {
       formData.append("vcfFiles", {
         uri: file.uri,
         name: file.name,
-        type: "text/vcard",
+        type: file.mimeType || "text/vcard",
       } as unknown as Blob);
     });
 
@@ -338,7 +356,10 @@ export default function HistoryScreen() {
     [],
   );
 
-  const sidebarRecentBackups = useMemo(() => backups.slice(0, 3), [backups]);
+  const sidebarRecentBackups = useMemo(
+    () => (activeTab === "local" ? backups.slice(0, 3) : []),
+    [activeTab, backups],
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-[#050a17]" edges={["top", "bottom"]}>

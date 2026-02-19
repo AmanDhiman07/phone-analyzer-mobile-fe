@@ -4,4 +4,5 @@ export type SelectedVcf = {
   name: string;
   uri: string;
   size: number;
+  mimeType?: string;
 };

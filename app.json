@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "phone-analyzer-mobile-fe",
+    "name": "Data Guard",
     "slug": "phone-analyzer-mobile-fe",
     "scheme": "expo-starter",
     "version": "1.0.0",
@@ -20,7 +20,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#031324"
       },
       "permissions": [
         "READ_CONTACTS",

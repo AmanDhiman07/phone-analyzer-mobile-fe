@@ -138,9 +138,9 @@ export function HistorySidebar({
 
             <View className="flex-row items-center justify-between mb-2">
               <Text className="text-[#e2e8f0] text-[25px] font-bold">
-                Recent Backups
+                {activeTab === "local" ? "Recent Backups" : "Cloud Backups"}
               </Text>
-              <Pressable onPress={() => onSelectTab("local")}>
+              <Pressable onPress={() => onSelectTab(activeTab)}>
                 <Text className="text-[#22c55e] text-xs font-semibold">
                   View All
                 </Text>
@@ -151,7 +151,9 @@ export function HistorySidebar({
               <View className="rounded-2xl border border-dashed border-[#334155] bg-[#0f1729] px-4 py-8 items-center">
                 <Ionicons name="archive-outline" size={24} color="#64748b" />
                 <Text className="text-[#94a3b8] text-xs mt-2">
-                  No backups yet
+                  {activeTab === "local"
+                    ? "No local backups yet"
+                    : "No cloud backups yet"}
                 </Text>
               </View>
             ) : (
