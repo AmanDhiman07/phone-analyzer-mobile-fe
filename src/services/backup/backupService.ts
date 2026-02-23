@@ -287,6 +287,52 @@ async function exportBackupToPublicFolder(
   }
 }
 
+async function findSafChildUri(
+  parentUri: string,
+  childName: string,
+): Promise<string | null> {
+  try {
+    const children =
+      await FileSystem.StorageAccessFramework.readDirectoryAsync(parentUri);
+    return (
+      children.find((childUri) => getSafLeafName(childUri) === childName) ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function getPersistedPublicBackupRootUri(): Promise<string | null> {
+  if (Platform.OS !== "android") return null;
+  await loadPersistedPublicRootState();
+  return cachedPublicBackupRootUri;
+}
+
+async function deletePublicBackupFiles(folderName: string): Promise<void> {
+  if (Platform.OS !== "android") return;
+
+  const publicRootUri = await getPersistedPublicBackupRootUri();
+  if (!publicRootUri) return;
+
+  const backupTypes = Object.keys(PUBLIC_BACKUP_FILE_FORMAT) as BackupType[];
+  for (const type of backupTypes) {
+    const subfolder = PUBLIC_BACKUP_FOLDER_BY_TYPE[type];
+    const subfolderUri = await findSafChildUri(publicRootUri, subfolder);
+    if (!subfolderUri) continue;
+
+    const { prefix, extension } = PUBLIC_BACKUP_FILE_FORMAT[type];
+    const expectedFileName = `${prefix}_${folderName}.${extension}`;
+    const files =
+      await FileSystem.StorageAccessFramework.readDirectoryAsync(subfolderUri);
+
+    for (const fileUri of files) {
+      if (getSafLeafName(fileUri) !== expectedFileName) continue;
+      await FileSystem.deleteAsync(fileUri, { idempotent: true });
+    }
+  }
+}
+
 export async function ensureBackupDirsExist(): Promise<void> {
   const root = getBackupRoot();
   const backups = getBackupsDir();
@@ -814,6 +860,12 @@ export async function deleteBackup(folderName: string): Promise<void> {
   const info = await FileSystem.getInfoAsync(backupDir);
   if (info.exists) {
     await FileSystem.deleteAsync(backupDir, { idempotent: true });
+  }
+
+  try {
+    await deletePublicBackupFiles(folderName);
+  } catch (error) {
+    console.warn("Public backup delete failed:", error);
   }
 }
 
