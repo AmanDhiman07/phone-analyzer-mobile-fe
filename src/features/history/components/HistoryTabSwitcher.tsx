@@ -18,16 +18,17 @@ export function HistoryTabSwitcher({
       <View className="flex-row">
         <Pressable
           onPress={() => onChange("local")}
-          className={`flex-1 rounded-xl py-2.5 px-2 ${activeTab === "local" ? "border border-white/35 bg-white/92" : "bg-transparent"}`}
+          className={`flex-1 rounded-xl py-2.5 px-2 ${activeTab === "local" ? "border border-[#3b82f6]/45 bg-[#1e293b]" : "bg-transparent"}`}
         >
           <View className="flex-row items-center justify-center">
             <Ionicons
               name="phone-portrait-outline"
               size={15}
-              color={activeTab === "local" ? "#0f172a" : "#cbd5e1"}
+              color={activeTab === "local" ? "#f8fafc" : "#cbd5e1"}
             />
             <Text
-              className={`ml-1.5 text-center text-sm font-semibold ${activeTab === "local" ? "text-[#0f172a]" : "text-[#cbd5e1]"}`}
+              className="ml-1.5 text-center text-sm font-semibold"
+              style={{ color: activeTab === "local" ? "#f8fafc" : "#cbd5e1" }}
             >
               Local
             </Text>
@@ -35,16 +36,17 @@ export function HistoryTabSwitcher({
         </Pressable>
         <Pressable
           onPress={() => onChange("cloud")}
-          className={`flex-1 rounded-xl py-2.5 px-2 ${activeTab === "cloud" ? "border border-white/35 bg-white/92" : "bg-transparent"}`}
+          className={`flex-1 rounded-xl py-2.5 px-2 ${activeTab === "cloud" ? "border border-[#3b82f6]/45 bg-[#1e293b]" : "bg-transparent"}`}
         >
           <View className="flex-row items-center justify-center">
             <Ionicons
               name="cloud-outline"
               size={15}
-              color={activeTab === "cloud" ? "#0f172a" : "#cbd5e1"}
+              color={activeTab === "cloud" ? "#f8fafc" : "#cbd5e1"}
             />
             <Text
-              className={`ml-1.5 text-center text-sm font-semibold ${activeTab === "cloud" ? "text-[#0f172a]" : "text-[#cbd5e1]"}`}
+              className="ml-1.5 text-center text-sm font-semibold"
+              style={{ color: activeTab === "cloud" ? "#f8fafc" : "#cbd5e1" }}
             >
               Cloud
             </Text>

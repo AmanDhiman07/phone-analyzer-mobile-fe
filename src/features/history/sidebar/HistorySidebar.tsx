@@ -146,20 +146,26 @@ export function HistorySidebar({
                 <View className="flex-row">
                   <Pressable
                     onPress={() => onSelectTab("local")}
-                    className={`flex-1 rounded-xl py-2.5 ${activeTab === "local" ? "border border-white/35 bg-white/92" : "bg-transparent"}`}
+                    className={`flex-1 rounded-xl py-2.5 ${activeTab === "local" ? "border border-[#3b82f6]/45 bg-[#1e293b]" : "bg-transparent"}`}
                   >
                     <Text
-                      className={`text-center text-sm font-semibold ${activeTab === "local" ? "text-[#0f172a]" : "text-[#cbd5e1]"}`}
+                      className="text-center text-sm font-semibold"
+                      style={{
+                        color: activeTab === "local" ? "#f8fafc" : "#cbd5e1",
+                      }}
                     >
                       Local Backups
                     </Text>
                   </Pressable>
                   <Pressable
                     onPress={() => onSelectTab("cloud")}
-                    className={`flex-1 rounded-xl py-2.5 ${activeTab === "cloud" ? "border border-white/35 bg-white/92" : "bg-transparent"}`}
+                    className={`flex-1 rounded-xl py-2.5 ${activeTab === "cloud" ? "border border-[#3b82f6]/45 bg-[#1e293b]" : "bg-transparent"}`}
                   >
                     <Text
-                      className={`text-center text-sm font-semibold ${activeTab === "cloud" ? "text-[#0f172a]" : "text-[#cbd5e1]"}`}
+                      className="text-center text-sm font-semibold"
+                      style={{
+                        color: activeTab === "cloud" ? "#f8fafc" : "#cbd5e1",
+                      }}
                     >
                       Cloud Backups
                     </Text>
