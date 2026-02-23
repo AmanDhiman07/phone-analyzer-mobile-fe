@@ -8,8 +8,12 @@ import {
   CONTACTS_FILE,
   MESSAGES_FILE,
   CALL_LOGS_FILE,
+  PUBLIC_BACKUP_ROOT_FOLDER,
+  PUBLIC_CONTACTS_FOLDER,
+  PUBLIC_SMS_FOLDER,
+  PUBLIC_CALLS_FOLDER,
 } from "@/constants/backup";
-import type { BackupManifest, BackupRecord } from "@/types/backup";
+import type { BackupManifest, BackupRecord, BackupType } from "@/types/backup";
 import {
   isSmsAvailable,
   isCallLogAvailable,
@@ -24,11 +28,255 @@ import {
 const getBackupRoot = () =>
   `${FileSystem.documentDirectory}Backups/${BACKUP_FOLDER_NAME}`;
 const getBackupsDir = () => `${getBackupRoot()}/${BACKUPS_SUBFOLDER}`;
+const PUBLIC_DOWNLOADS_DIR = "Download";
+const PUBLIC_BACKUP_ROOT_PATH = `/storage/emulated/0/${PUBLIC_DOWNLOADS_DIR}/${PUBLIC_BACKUP_ROOT_FOLDER}`;
+const PUBLIC_BACKUP_URI_STATE_FILE = `${getBackupRoot()}/public-backup-uri-state.json`;
+const PUBLIC_BACKUP_FOLDER_BY_TYPE: Record<BackupType, string> = {
+  contacts: PUBLIC_CONTACTS_FOLDER,
+  messages: PUBLIC_SMS_FOLDER,
+  callLogs: PUBLIC_CALLS_FOLDER,
+};
+const PUBLIC_BACKUP_FILE_FORMAT: Record<
+  BackupType,
+  {
+    prefix: string;
+    extension: "json" | "vcf";
+    mimeType: string;
+  }
+> = {
+  contacts: {
+    prefix: "contacts",
+    extension: "vcf",
+    mimeType: "text/vcard",
+  },
+  messages: {
+    prefix: "sms",
+    extension: "json",
+    mimeType: "application/json",
+  },
+  callLogs: {
+    prefix: "calls",
+    extension: "json",
+    mimeType: "application/json",
+  },
+};
+
+let cachedPublicBackupRootUri: string | null = null;
+let cachedPublicBackupRootPath = PUBLIC_BACKUP_ROOT_PATH;
+let publicRootLoadedFromDisk = false;
 
 function getTimestampFolder(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+}
+
+function getSafLeafName(uri: string): string {
+  try {
+    const decoded = decodeURIComponent(uri).replace(/\/+$/, "");
+    const index = decoded.lastIndexOf("/");
+    return index >= 0 ? decoded.slice(index + 1) : decoded;
+  } catch {
+    return uri;
+  }
+}
+
+function getStoragePathFromSafUri(uri: string): string | null {
+  try {
+    const decoded = decodeURIComponent(uri);
+    const marker = "primary:";
+    const markerIndex = decoded.lastIndexOf(marker);
+    if (markerIndex < 0) return null;
+    const relativePath = decoded
+      .slice(markerIndex + marker.length)
+      .replace(/^\/+/, "");
+    return relativePath
+      ? `/storage/emulated/0/${relativePath}`
+      : "/storage/emulated/0";
+  } catch {
+    return null;
+  }
+}
+
+function escapeVCardValue(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,");
+}
+
+function normalizeVCardType(label: string, fallback: string): string {
+  const normalized = label
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, "");
+  return normalized || fallback;
+}
+
+function toVCardContacts(contacts: Contacts.Contact[]): string {
+  return contacts
+    .map((contact) => {
+      const firstName = (contact.firstName ?? "").trim();
+      const lastName = (contact.lastName ?? "").trim();
+      const fullName =
+        (contact.name ?? "").trim() ||
+        `${firstName} ${lastName}`.trim() ||
+        "Unknown";
+
+      const lines = [
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        `FN:${escapeVCardValue(fullName)}`,
+        `N:${escapeVCardValue(lastName)};${escapeVCardValue(firstName)};;;`,
+      ];
+
+      const phones = Array.isArray(contact.phoneNumbers)
+        ? contact.phoneNumbers
+        : [];
+      for (const phone of phones) {
+        const number = (phone?.number ?? "").trim();
+        if (!number) continue;
+        const type = normalizeVCardType(phone?.label ?? "", "CELL");
+        lines.push(`TEL;TYPE=${type}:${escapeVCardValue(number)}`);
+      }
+
+      const emails = Array.isArray(contact.emails) ? contact.emails : [];
+      for (const emailEntry of emails) {
+        const email = (emailEntry?.email ?? "").trim();
+        if (!email) continue;
+        const type = normalizeVCardType(emailEntry?.label ?? "", "INTERNET");
+        lines.push(`EMAIL;TYPE=${type}:${escapeVCardValue(email)}`);
+      }
+
+      lines.push("END:VCARD");
+      return lines.join("\r\n");
+    })
+    .join("\r\n");
+}
+
+async function loadPersistedPublicRootState(): Promise<void> {
+  if (publicRootLoadedFromDisk) return;
+  publicRootLoadedFromDisk = true;
+
+  try {
+    const info = await FileSystem.getInfoAsync(PUBLIC_BACKUP_URI_STATE_FILE);
+    if (!info.exists) return;
+
+    const raw = await FileSystem.readAsStringAsync(
+      PUBLIC_BACKUP_URI_STATE_FILE,
+    );
+    const parsed = JSON.parse(raw) as {
+      uri?: string;
+      path?: string;
+    };
+    const persistedUri = (parsed.uri ?? "").trim();
+    const persistedPath = (parsed.path ?? "").trim();
+    if (!persistedUri) return;
+
+    await FileSystem.StorageAccessFramework.readDirectoryAsync(persistedUri);
+    cachedPublicBackupRootUri = persistedUri;
+    if (persistedPath) {
+      cachedPublicBackupRootPath = persistedPath;
+    }
+  } catch {
+    cachedPublicBackupRootUri = null;
+  }
+}
+
+async function persistPublicRootState(
+  uri: string,
+  path: string,
+): Promise<void> {
+  try {
+    await FileSystem.writeAsStringAsync(
+      PUBLIC_BACKUP_URI_STATE_FILE,
+      JSON.stringify({ uri, path }),
+    );
+  } catch {
+    // best effort cache to avoid repeated picker prompts across app launches
+  }
+}
+
+async function ensureSafDirectory(
+  parentUri: string,
+  dirName: string,
+): Promise<string> {
+  const children =
+    await FileSystem.StorageAccessFramework.readDirectoryAsync(parentUri);
+  const existing = children.find(
+    (childUri) => getSafLeafName(childUri) === dirName,
+  );
+  if (existing) return existing;
+  return FileSystem.StorageAccessFramework.makeDirectoryAsync(
+    parentUri,
+    dirName,
+  );
+}
+
+async function getPublicBackupRootUri(): Promise<string | null> {
+  if (Platform.OS !== "android") return null;
+  await loadPersistedPublicRootState();
+  if (cachedPublicBackupRootUri) return cachedPublicBackupRootUri;
+
+  const initialUri =
+    FileSystem.StorageAccessFramework.getUriForDirectoryInRoot(
+      PUBLIC_DOWNLOADS_DIR,
+    );
+  const permission =
+    await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(
+      initialUri,
+    );
+  if (!permission.granted || !permission.directoryUri) return null;
+
+  const selectedDirName = getSafLeafName(permission.directoryUri);
+  const selectedIsRootFolder = selectedDirName === PUBLIC_BACKUP_ROOT_FOLDER;
+  const rootUri = selectedIsRootFolder
+    ? permission.directoryUri
+    : await ensureSafDirectory(
+        permission.directoryUri,
+        PUBLIC_BACKUP_ROOT_FOLDER,
+      );
+  const selectedRootPath = getStoragePathFromSafUri(permission.directoryUri);
+  if (selectedRootPath) {
+    cachedPublicBackupRootPath = selectedIsRootFolder
+      ? selectedRootPath
+      : `${selectedRootPath}/${PUBLIC_BACKUP_ROOT_FOLDER}`;
+  }
+  cachedPublicBackupRootUri = rootUri;
+  await persistPublicRootState(rootUri, cachedPublicBackupRootPath);
+  return rootUri;
+}
+
+async function exportBackupToPublicFolder(
+  type: BackupType,
+  folderName: string,
+  payload: string,
+): Promise<string | null> {
+  if (Platform.OS !== "android") return null;
+
+  try {
+    const publicRootUri = await getPublicBackupRootUri();
+    if (!publicRootUri) return null;
+
+    const subfolder = PUBLIC_BACKUP_FOLDER_BY_TYPE[type];
+    const subfolderUri = await ensureSafDirectory(publicRootUri, subfolder);
+    const { prefix, extension, mimeType } = PUBLIC_BACKUP_FILE_FORMAT[type];
+    const fileName = `${prefix}_${folderName}.${extension}`;
+    const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+      subfolderUri,
+      fileName,
+      mimeType,
+    );
+    await FileSystem.StorageAccessFramework.writeAsStringAsync(
+      fileUri,
+      payload,
+    );
+    return `${cachedPublicBackupRootPath}/${subfolder}`;
+  } catch (error) {
+    console.warn("Public backup export failed:", error);
+    return null;
+  }
 }
 
 export async function ensureBackupDirsExist(): Promise<void> {
@@ -118,6 +366,7 @@ export async function backupContacts(): Promise<{
   }
 
   const contactsJson = JSON.stringify(contacts, null, 0);
+  const contactsVcf = toVCardContacts(contacts);
   const messagesJson = "[]";
   const callLogsJson = "[]";
 
@@ -156,7 +405,13 @@ export async function backupContacts(): Promise<{
     JSON.stringify(manifest, null, 0),
   );
 
-  return { path: backupDir, count: contacts.length };
+  const publicPath = await exportBackupToPublicFolder(
+    "contacts",
+    folderName,
+    contactsVcf,
+  );
+
+  return { path: publicPath ?? backupDir, count: contacts.length };
 }
 
 export async function backupMessages(): Promise<{
@@ -210,7 +465,13 @@ export async function backupMessages(): Promise<{
     JSON.stringify(manifest, null, 0),
   );
 
-  return { path: backupDir, count: messages.length };
+  const publicPath = await exportBackupToPublicFolder(
+    "messages",
+    folderName,
+    messagesJson,
+  );
+
+  return { path: publicPath ?? backupDir, count: messages.length };
 }
 
 export async function backupCallLogs(): Promise<{
@@ -264,7 +525,13 @@ export async function backupCallLogs(): Promise<{
     JSON.stringify(manifest, null, 0),
   );
 
-  return { path: backupDir, count: callLogs.length };
+  const publicPath = await exportBackupToPublicFolder(
+    "callLogs",
+    folderName,
+    callLogsJson,
+  );
+
+  return { path: publicPath ?? backupDir, count: callLogs.length };
 }
 
 export async function restoreContacts(backupFolderName: string): Promise<{
@@ -504,6 +771,9 @@ export async function deleteBackup(folderName: string): Promise<void> {
 }
 
 export function getBackupRootPath(): string {
+  if (Platform.OS === "android") {
+    return cachedPublicBackupRootPath;
+  }
   return getBackupRoot();
 }
 
