@@ -4,7 +4,7 @@ import {
   Text,
   Pressable,
   Alert,
-  AppState,
+  Linking,
   Modal,
   Clipboard,
   RefreshControl,
@@ -30,7 +30,6 @@ import {
   getDefaultSmsPackage,
   isDefaultPhoneApp,
   isDefaultSmsApp,
-  openDefaultPhoneAppSettings,
   requestDefaultPhoneApp,
   requestDefaultSmsPackage,
   requestDefaultSmsApp,
@@ -136,6 +135,38 @@ export default function HomeScreen() {
     Alert.alert("Copied", "Backup path copied to clipboard.");
   }, [successModal.path]);
 
+  const openAppSettings = useCallback(() => {
+    Linking.openSettings().catch(() => {
+      Alert.alert(
+        "Unable to open settings",
+        "Please open app settings manually and allow required permissions.",
+      );
+    });
+  }, []);
+
+  const handleBackupPermissionDenied = useCallback(
+    (permissionLabel: string, error: unknown): boolean => {
+      const message = String(error);
+      if (!message.toLowerCase().includes("permission denied")) {
+        return false;
+      }
+
+      Alert.alert(
+        "Permission Required",
+        `${permissionLabel} permission is denied. Open app settings and allow permission to continue backup.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Open Settings",
+            onPress: openAppSettings,
+          },
+        ],
+      );
+      return true;
+    },
+    [openAppSettings],
+  );
+
   const loadCounts = useCallback(async () => {
     const c = await getContactsCount();
     setContactsCount(c);
@@ -164,11 +195,14 @@ export default function HomeScreen() {
       showBackupSuccess("Contacts", count, path);
       await loadCounts();
     } catch (e) {
-      Alert.alert("Backup failed", String(e));
+      const handled = handleBackupPermissionDenied("Contacts", e);
+      if (!handled) {
+        Alert.alert("Backup failed", String(e));
+      }
     } finally {
       setLoading(false);
     }
-  }, [loadCounts, showBackupSuccess]);
+  }, [handleBackupPermissionDenied, loadCounts, showBackupSuccess]);
 
   const handleRestoreContacts = useCallback(async () => {
     const backups = await listBackups();
@@ -214,11 +248,14 @@ export default function HomeScreen() {
       showBackupSuccess("Messages", count, path);
       await loadCounts();
     } catch (e) {
-      Alert.alert("Backup failed", String(e));
+      const handled = handleBackupPermissionDenied("SMS", e);
+      if (!handled) {
+        Alert.alert("Backup failed", String(e));
+      }
     } finally {
       setLoading(false);
     }
-  }, [loadCounts, showBackupSuccess]);
+  }, [handleBackupPermissionDenied, loadCounts, showBackupSuccess]);
 
   const handleRestoreMessages = useCallback(() => {
     const run = async (previousDefaultPackage: string | null = null) => {
@@ -261,7 +298,8 @@ export default function HomeScreen() {
                       const errMsg = String(error);
                       const notDefault =
                         errMsg.includes("default SMS app") ||
-                        (error as { code?: string })?.code === "ERR_NOT_DEFAULT_SMS";
+                        (error as { code?: string })?.code ===
+                          "ERR_NOT_DEFAULT_SMS";
                       if (notDefault) {
                         Alert.alert(
                           "Default SMS app required",
@@ -361,11 +399,14 @@ export default function HomeScreen() {
       showBackupSuccess("Call Logs", count, path);
       await loadCounts();
     } catch (e) {
-      Alert.alert("Backup failed", String(e));
+      const handled = handleBackupPermissionDenied("Call log", e);
+      if (!handled) {
+        Alert.alert("Backup failed", String(e));
+      }
     } finally {
       setLoading(false);
     }
-  }, [loadCounts, showBackupSuccess]);
+  }, [handleBackupPermissionDenied, loadCounts, showBackupSuccess]);
 
   const handleRestoreCallLogs = useCallback(() => {
     const run = async () => {
@@ -409,7 +450,8 @@ export default function HomeScreen() {
                       const errMsg = String(error);
                       const notDefault =
                         errMsg.includes("default Phone app") ||
-                        (error as { code?: string })?.code === "ERR_NOT_DEFAULT_DIALER";
+                        (error as { code?: string })?.code ===
+                          "ERR_NOT_DEFAULT_DIALER";
                       if (notDefault) {
                         Alert.alert(
                           "Default Phone app required",
