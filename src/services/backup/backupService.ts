@@ -330,6 +330,7 @@ async function requestSmsPermission(): Promise<boolean> {
 }
 
 const READ_CALL_LOG = "android.permission.READ_CALL_LOG";
+const WRITE_CALL_LOG = "android.permission.WRITE_CALL_LOG";
 
 async function requestCallLogPermission(): Promise<boolean> {
   if (Platform.OS !== "android") return false;
@@ -343,27 +344,40 @@ async function requestCallLogPermission(): Promise<boolean> {
   }
 }
 
+async function requestWriteCallLogPermission(): Promise<boolean> {
+  if (Platform.OS !== "android") return false;
+  try {
+    const permission =
+      PermissionsAndroid.PERMISSIONS.WRITE_CALL_LOG ?? WRITE_CALL_LOG;
+    const granted = await PermissionsAndroid.request(permission);
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
+
 export async function backupContacts(): Promise<{
   path: string;
   count: number;
 }> {
+  const { status } = await Contacts.requestPermissionsAsync();
+  if (status !== "granted") {
+    throw new Error("Contacts permission denied.");
+  }
+
   await ensureBackupDirsExist();
   const folderName = getTimestampFolder();
   const backupDir = `${getBackupsDir()}/${folderName}`;
   await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
 
-  const { status } = await Contacts.requestPermissionsAsync();
-  let contacts: Contacts.Contact[] = [];
-  if (status === "granted") {
-    const result = await Contacts.getContactsAsync({
-      fields: [
-        Contacts.Fields.Name,
-        Contacts.Fields.PhoneNumbers,
-        Contacts.Fields.Emails,
-      ],
-    });
-    contacts = result.data;
-  }
+  const result = await Contacts.getContactsAsync({
+    fields: [
+      Contacts.Fields.Name,
+      Contacts.Fields.PhoneNumbers,
+      Contacts.Fields.Emails,
+    ],
+  });
+  const contacts = result.data;
 
   const contactsJson = JSON.stringify(contacts, null, 0);
   const contactsVcf = toVCardContacts(contacts);
@@ -685,11 +699,13 @@ export async function restoreCallLogs(backupFolderName: string): Promise<{
     throw new Error("Selected backup does not include call logs.");
   }
 
-  const permission =
-    PermissionsAndroid.PERMISSIONS.WRITE_CALL_LOG ??
-    "android.permission.WRITE_CALL_LOG";
-  const writeGranted = await PermissionsAndroid.request(permission);
-  if (writeGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+  const readGranted = await requestCallLogPermission();
+  if (!readGranted) {
+    throw new Error("READ_CALL_LOG permission denied.");
+  }
+
+  const writeGranted = await requestWriteCallLogPermission();
+  if (!writeGranted) {
     throw new Error("WRITE_CALL_LOG permission denied.");
   }
 
@@ -717,6 +733,11 @@ export async function restoreMessages(backupFolderName: string): Promise<{
   const info = await FileSystem.getInfoAsync(messagesPath);
   if (!info.exists) {
     throw new Error("Selected backup does not include messages.");
+  }
+
+  const smsGranted = await requestSmsPermission();
+  if (!smsGranted) {
+    throw new Error("SMS permission denied.");
   }
 
   const raw = await FileSystem.readAsStringAsync(messagesPath);
