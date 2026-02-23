@@ -148,6 +148,15 @@ export default function HomeScreen() {
   const handleBackupPermissionDenied = useCallback(
     (permissionLabel: string, error: unknown): boolean => {
       const message = String(error);
+
+      if (message.toLowerCase().includes("folder permission denied")) {
+        Alert.alert(
+          "Folder Permission Required",
+          "Backup folder access was denied. Please allow folder access to create backups.",
+        );
+        return true;
+      }
+
       if (!message.toLowerCase().includes("permission denied")) {
         return false;
       }

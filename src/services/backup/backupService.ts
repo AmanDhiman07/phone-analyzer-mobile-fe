@@ -248,6 +248,14 @@ async function getPublicBackupRootUri(): Promise<string | null> {
   return rootUri;
 }
 
+async function ensurePublicBackupFolderPermission(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  const rootUri = await getPublicBackupRootUri();
+  if (!rootUri) {
+    throw new Error("Backup folder permission denied.");
+  }
+}
+
 async function exportBackupToPublicFolder(
   type: BackupType,
   folderName: string,
@@ -360,6 +368,8 @@ export async function backupContacts(): Promise<{
   path: string;
   count: number;
 }> {
+  await ensurePublicBackupFolderPermission();
+
   const { status } = await Contacts.requestPermissionsAsync();
   if (status !== "granted") {
     throw new Error("Contacts permission denied.");
@@ -424,6 +434,10 @@ export async function backupContacts(): Promise<{
     folderName,
     contactsVcf,
   );
+  if (Platform.OS === "android" && !publicPath) {
+    await FileSystem.deleteAsync(backupDir, { idempotent: true });
+    throw new Error("Backup folder permission denied.");
+  }
 
   return { path: publicPath ?? backupDir, count: contacts.length };
 }
@@ -432,6 +446,8 @@ export async function backupMessages(): Promise<{
   path: string;
   count: number;
 }> {
+  await ensurePublicBackupFolderPermission();
+
   if (Platform.OS !== "android" || !isSmsAvailable()) {
     throw new Error(
       "SMS backup requires a development build. Run: npx expo prebuild && npx expo run:android",
@@ -484,6 +500,10 @@ export async function backupMessages(): Promise<{
     folderName,
     messagesJson,
   );
+  if (Platform.OS === "android" && !publicPath) {
+    await FileSystem.deleteAsync(backupDir, { idempotent: true });
+    throw new Error("Backup folder permission denied.");
+  }
 
   return { path: publicPath ?? backupDir, count: messages.length };
 }
@@ -492,6 +512,8 @@ export async function backupCallLogs(): Promise<{
   path: string;
   count: number;
 }> {
+  await ensurePublicBackupFolderPermission();
+
   if (Platform.OS !== "android" || !isCallLogAvailable()) {
     throw new Error(
       "Call logs need the native module. Run in project folder: npx expo prebuild --clean && npx expo run:android",
@@ -544,6 +566,10 @@ export async function backupCallLogs(): Promise<{
     folderName,
     callLogsJson,
   );
+  if (Platform.OS === "android" && !publicPath) {
+    await FileSystem.deleteAsync(backupDir, { idempotent: true });
+    throw new Error("Backup folder permission denied.");
+  }
 
   return { path: publicPath ?? backupDir, count: callLogs.length };
 }
