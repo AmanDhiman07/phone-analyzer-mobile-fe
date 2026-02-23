@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import type { AuthSession } from "@/services/auth/sessionStorage";
+import { GlassPanel } from "@/components/GlassPanel";
 
 export function SessionStatusCard({
   session,
@@ -11,7 +12,10 @@ export function SessionStatusCard({
   onCloudLogin: () => void;
 }) {
   return (
-    <View className="rounded-2xl border border-[#1f2937] bg-[#0b1224] px-4 py-3 mb-4">
+    <GlassPanel
+      className="mb-4 rounded-2xl border-[#1f2937]"
+      contentStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
+    >
       <View className="flex-row items-center justify-between">
         <View className="flex-1 pr-3">
           <Text className="text-[#e2e8f0] text-sm font-semibold">
@@ -39,6 +43,6 @@ export function SessionStatusCard({
           </Pressable>
         )}
       </View>
-    </View>
+    </GlassPanel>
   );
 }

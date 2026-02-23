@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { AuthSession } from "@/services/auth/sessionStorage";
+import { GlassPanel } from "@/components/GlassPanel";
 
 export function CloudBackupsPanel({
   session,
@@ -12,7 +13,10 @@ export function CloudBackupsPanel({
   onAddVcf: () => void;
 }) {
   return (
-    <View className="rounded-2xl border border-[#1f2937] bg-[#0b1224] px-4 py-4">
+    <GlassPanel
+      className="rounded-2xl border-[#1f2937]"
+      contentStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}
+    >
       <View className="flex-row items-center mb-3">
         <View className="w-11 h-11 rounded-xl bg-[#132e4f] items-center justify-center mr-3">
           <Ionicons name="cloud-upload-outline" size={22} color="#7dd3fc" />
@@ -27,14 +31,17 @@ export function CloudBackupsPanel({
         </View>
       </View>
 
-      <View className="rounded-xl border border-[#223044] bg-[#0f1729] px-3 py-3 mb-3">
+      <GlassPanel
+        className="mb-3 rounded-xl border-[#223044]"
+        contentStyle={{ paddingHorizontal: 12, paddingVertical: 12 }}
+      >
         <Text className="text-[#cbd5e1] text-xs font-semibold">
           Quick Steps
         </Text>
         <Text className="text-[#94a3b8] text-xs mt-1">
           1. Login to cloud 2. Tap upload 3. Select VCF files
         </Text>
-      </View>
+      </GlassPanel>
 
       {!session ? (
         <Pressable
@@ -60,6 +67,6 @@ export function CloudBackupsPanel({
           </Text>
         </>
       )}
-    </View>
+    </GlassPanel>
   );
 }

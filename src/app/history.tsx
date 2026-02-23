@@ -12,6 +12,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { File } from "expo-file-system";
+import { GlassPanel } from "@/components/GlassPanel";
 import {
   listBackups,
   deleteBackup,
@@ -388,7 +389,10 @@ export default function HistoryScreen() {
         }}
       >
         <View className="flex-1 bg-black/70 items-center justify-center px-6">
-          <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#070d1d] p-5">
+          <GlassPanel
+            className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
+            contentStyle={{ padding: 20 }}
+          >
             <View className="w-14 h-14 rounded-2xl bg-[#3f1d1d] items-center justify-center mb-4 self-center">
               <Ionicons name="trash-outline" size={28} color="#f87171" />
             </View>
@@ -398,14 +402,17 @@ export default function HistoryScreen() {
             <Text className="text-[#9ca3af] text-center text-sm mb-4">
               This action is permanent and cannot be undone.
             </Text>
-            <View className="rounded-2xl border border-[#1f2937] bg-[#0f172a] p-3 mb-4">
+            <GlassPanel
+              className="mb-4 rounded-2xl border-[#1f2937]"
+              contentStyle={{ padding: 12 }}
+            >
               <Text className="text-[#e2e8f0] text-sm font-semibold">
                 {deleteTarget ? formatBackupDate(deleteTarget.date) : ""}
               </Text>
               <Text className="text-[#94a3b8] text-xs mt-1">
                 {deleteTarget ? formatSize(deleteTarget.sizeBytes) : ""}
               </Text>
-            </View>
+            </GlassPanel>
             <View className="flex-row gap-3">
               <Pressable
                 disabled={isDeleting}
@@ -426,7 +433,7 @@ export default function HistoryScreen() {
                 </Text>
               </Pressable>
             </View>
-          </View>
+          </GlassPanel>
         </View>
       </Modal>
 
@@ -437,7 +444,10 @@ export default function HistoryScreen() {
         onRequestClose={() => setUploadModalVisible(false)}
       >
         <View className="flex-1 bg-black/70 items-center justify-center px-6">
-          <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#111c33] p-5">
+          <GlassPanel
+            className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
+            contentStyle={{ padding: 20 }}
+          >
             <View className="w-14 h-14 rounded-2xl bg-[#173f85] items-center justify-center mb-4 self-center">
               <Ionicons name="cloud-upload" size={28} color="#60a5fa" />
             </View>
@@ -451,7 +461,10 @@ export default function HistoryScreen() {
             <Text className="text-[#94a3b8] text-[11px] font-semibold mb-1 uppercase">
               Name
             </Text>
-            <View className="rounded-xl border border-[#23324a] bg-[#0f1729] px-3 mb-3">
+            <GlassPanel
+              className="mb-3 rounded-xl border-[#23324a]"
+              contentStyle={{ paddingHorizontal: 12 }}
+            >
               <TextInput
                 value={uploadName}
                 onChangeText={setUploadName}
@@ -459,12 +472,15 @@ export default function HistoryScreen() {
                 placeholderTextColor="#64748b"
                 className="py-3 text-[#e2e8f0]"
               />
-            </View>
+            </GlassPanel>
 
             <Text className="text-[#94a3b8] text-[11px] font-semibold mb-1 uppercase">
               Case ID
             </Text>
-            <View className="rounded-xl border border-[#23324a] bg-[#0f1729] px-3 mb-3">
+            <GlassPanel
+              className="mb-3 rounded-xl border-[#23324a]"
+              contentStyle={{ paddingHorizontal: 12 }}
+            >
               <TextInput
                 value={caseId}
                 onChangeText={setCaseId}
@@ -472,7 +488,7 @@ export default function HistoryScreen() {
                 placeholderTextColor="#64748b"
                 className="py-3 text-[#e2e8f0]"
               />
-            </View>
+            </GlassPanel>
 
             <Pressable
               onPress={handlePickVcfFiles}
@@ -488,7 +504,10 @@ export default function HistoryScreen() {
             </Text>
 
             {selectedFiles.length > 0 ? (
-              <View className="rounded-xl border border-[#1f2937] bg-[#0b1224] px-3 py-2 mb-3">
+              <GlassPanel
+                className="mb-3 rounded-xl border-[#1f2937]"
+                contentStyle={{ paddingHorizontal: 12, paddingVertical: 8 }}
+              >
                 {selectedFiles.map((file) => (
                   <View
                     key={file.uri}
@@ -508,7 +527,7 @@ export default function HistoryScreen() {
                     </Pressable>
                   </View>
                 ))}
-              </View>
+              </GlassPanel>
             ) : null}
 
             <Pressable
@@ -529,7 +548,7 @@ export default function HistoryScreen() {
                 Cancel
               </Text>
             </Pressable>
-          </View>
+          </GlassPanel>
         </View>
       </Modal>
 
@@ -542,7 +561,10 @@ export default function HistoryScreen() {
         }
       >
         <View className="flex-1 bg-black/70 items-center justify-center px-6">
-          <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#0b1224] p-5">
+          <GlassPanel
+            className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
+            contentStyle={{ padding: 20 }}
+          >
             <View className="w-14 h-14 rounded-2xl bg-[#14324d] items-center justify-center mb-4 self-center">
               <Ionicons name="checkmark-done" size={30} color="#22d3ee" />
             </View>
@@ -554,7 +576,10 @@ export default function HistoryScreen() {
             </Text>
 
             {uploadSuccessModal.summary ? (
-              <View className="rounded-2xl border border-[#1f2937] bg-[#111827] p-3 mb-4">
+              <GlassPanel
+                className="mb-4 rounded-2xl border-[#1f2937]"
+                contentStyle={{ padding: 12 }}
+              >
                 <Text className="text-[#cbd5e1] text-sm">
                   Total Contacts: {uploadSuccessModal.summary.totalContacts}
                 </Text>
@@ -565,7 +590,7 @@ export default function HistoryScreen() {
                   Existing Contacts:{" "}
                   {uploadSuccessModal.summary.existingContacts}
                 </Text>
-              </View>
+              </GlassPanel>
             ) : null}
 
             <Pressable
@@ -576,7 +601,7 @@ export default function HistoryScreen() {
             >
               <Text className="text-white text-center font-bold">Done</Text>
             </Pressable>
-          </View>
+          </GlassPanel>
         </View>
       </Modal>
 

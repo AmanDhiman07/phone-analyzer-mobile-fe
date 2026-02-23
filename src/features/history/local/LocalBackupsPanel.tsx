@@ -1,7 +1,8 @@
-import { FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { BackupRecord } from "@/types/backup";
 import { BackupListItem } from "@/features/history/shared/BackupListItem";
+import { GlassPanel } from "@/components/GlassPanel";
 
 export function LocalBackupsPanel({
   backups,
@@ -14,17 +15,23 @@ export function LocalBackupsPanel({
 }) {
   return (
     <>
-      <View className="rounded-2xl border border-[#1f2937] bg-[#0b1224] px-4 py-3 mb-4">
+      <GlassPanel
+        className="mb-4 rounded-2xl border-[#1f2937]"
+        contentStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
+      >
         <Text className="text-[#e2e8f0] text-sm font-semibold">
           Recent Backups
         </Text>
         <Text className="text-[#94a3b8] text-xs mt-1">
           {backups.length} total entries
         </Text>
-      </View>
+      </GlassPanel>
 
       {backups.length === 0 ? (
-        <View className="rounded-2xl border border-dashed border-[#334155] bg-[#0b1224] px-4 py-10 items-center">
+        <GlassPanel
+          className="items-center rounded-2xl border-dashed border-[#334155]"
+          contentStyle={{ paddingHorizontal: 16, paddingVertical: 40 }}
+        >
           <Ionicons name="archive-outline" size={28} color="#64748b" />
           <Text className="text-[#cbd5e1] text-sm font-semibold mt-3">
             No backups yet
@@ -38,7 +45,7 @@ export function LocalBackupsPanel({
           >
             <Text className="text-white text-xs font-semibold">Go to Home</Text>
           </Pressable>
-        </View>
+        </GlassPanel>
       ) : (
         <FlatList
           data={backups}

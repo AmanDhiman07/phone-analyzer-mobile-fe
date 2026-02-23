@@ -13,6 +13,7 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { GlassPanel } from "@/components/GlassPanel";
 import {
   getBackupRootPath,
   getContactsCount,
@@ -55,7 +56,7 @@ function BackupCard({
   accentText: string;
 }) {
   return (
-    <View className="rounded-3xl border border-[#1f2937] bg-[#0f1729] p-4 mb-4">
+    <GlassPanel className="mb-4 rounded-3xl" contentStyle={{ padding: 16 }}>
       <View className="flex-row items-center justify-between mb-4">
         <View className="flex-row items-center flex-1">
           <View
@@ -65,7 +66,7 @@ function BackupCard({
           </View>
           <View className="flex-1">
             <Text className="text-white text-base font-bold">{label}</Text>
-            <Text className="text-[#9ca3af] text-xs mt-0.5">
+            <Text className="text-[#cbd5e1] text-xs mt-0.5">
               {loading
                 ? "Updating..."
                 : count !== null
@@ -87,14 +88,14 @@ function BackupCard({
         <Pressable
           onPress={onRestore}
           disabled={loading}
-          className="flex-1 rounded-xl border border-[#334155] bg-[#111827] py-3 active:opacity-80 disabled:opacity-50"
+          className="flex-1 rounded-xl border border-white/20 bg-[#10192b]/85 py-3 active:opacity-80 disabled:opacity-50"
         >
           <Text className="text-[#e5e7eb] text-center font-semibold">
             Restore
           </Text>
         </Pressable>
       </View>
-    </View>
+    </GlassPanel>
   );
 }
 
@@ -530,7 +531,10 @@ export default function HomeScreen() {
         }
       >
         <View className="flex-1 bg-black/70 items-center justify-center px-6">
-          <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#070d1d] p-5">
+          <GlassPanel
+            className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
+            contentStyle={{ padding: 20 }}
+          >
             <View className="w-14 h-14 rounded-2xl bg-[#123347] items-center justify-center mb-4 self-center">
               <Ionicons name="checkmark-done" size={30} color="#22d3ee" />
             </View>
@@ -540,14 +544,17 @@ export default function HomeScreen() {
             <Text className="text-[#9ca3af] text-center text-sm mt-1 mb-4">
               {successModal.count.toLocaleString()} items saved
             </Text>
-            <View className="rounded-2xl border border-[#1f2937] bg-[#0f172a] p-3 mb-4">
+            <GlassPanel
+              className="mb-4 rounded-2xl border-[#1f2937]"
+              contentStyle={{ padding: 12 }}
+            >
               <Text className="text-[#64748b] text-[11px] uppercase tracking-wider mb-1">
                 Location
               </Text>
               <Text className="text-[#38bdf8] text-xs" numberOfLines={3}>
                 {successModal.path}
               </Text>
-            </View>
+            </GlassPanel>
             <View className="flex-row gap-3">
               <Pressable
                 onPress={handleCopyPath}
@@ -568,7 +575,7 @@ export default function HomeScreen() {
                 </Text>
               </Pressable>
             </View>
-          </View>
+          </GlassPanel>
         </View>
       </Modal>
 
@@ -621,20 +628,20 @@ export default function HomeScreen() {
           />
         }
       >
-        <View className="rounded-3xl border border-[#1f2937] bg-[#0b1224] p-4 mb-5">
-          <Text className="text-[#cbd5e1] text-sm font-semibold mb-2">
+        <GlassPanel className="mb-5 rounded-3xl" contentStyle={{ padding: 16 }}>
+          <Text className="text-[#e2e8f0] text-sm font-semibold mb-2">
             Backup Destination
           </Text>
-          <Text className="text-[#38bdf8] text-xs" numberOfLines={2}>
+          <Text className="text-[#7dd3fc] text-xs" numberOfLines={2}>
             {backupPath}
           </Text>
           <View className="flex-row items-center mt-3">
-            <Ionicons name="lock-closed-outline" size={14} color="#94a3b8" />
-            <Text className="text-[#94a3b8] text-xs ml-1.5">
+            <Ionicons name="lock-closed-outline" size={14} color="#cbd5e1" />
+            <Text className="text-[#cbd5e1] text-xs ml-1.5">
               Stored only on this device
             </Text>
           </View>
-        </View>
+        </GlassPanel>
 
         <BackupCard
           icon="people"

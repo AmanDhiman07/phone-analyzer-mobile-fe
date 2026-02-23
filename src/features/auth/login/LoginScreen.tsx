@@ -2,6 +2,7 @@ import { Modal, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { GlassPanel } from "@/components/GlassPanel";
 import { useLoginScreenController } from "./useLoginScreenController";
 
 export function LoginScreen() {
@@ -39,7 +40,10 @@ export function LoginScreen() {
             }
           >
             <View className="flex-1 bg-black/70 items-center justify-center px-6">
-              <View className="w-full max-w-[360px] rounded-3xl border border-[#1e293b] bg-[#0b1224] p-5">
+              <GlassPanel
+                className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
+                contentStyle={{ padding: 20 }}
+              >
                 <View className="w-14 h-14 rounded-2xl bg-[#14324d] items-center justify-center mb-4 self-center">
                   <Ionicons name="checkmark-done" size={30} color="#22d3ee" />
                 </View>
@@ -50,14 +54,17 @@ export function LoginScreen() {
                   {loginSuccessModal.message}
                 </Text>
                 {userData ? (
-                  <View className="rounded-2xl border border-[#1f2937] bg-[#111827] p-3 mb-4">
+                  <GlassPanel
+                    className="mb-4 rounded-2xl border-[#1f2937]"
+                    contentStyle={{ padding: 12 }}
+                  >
                     <Text className="text-[#cbd5e1] text-sm">
                       Name: {userData.name}
                     </Text>
                     <Text className="text-[#93c5fd] text-sm mt-1">
                       Mobile: {userData.mobileNumber}
                     </Text>
-                  </View>
+                  </GlassPanel>
                 ) : null}
                 <Pressable
                   onPress={() => {
@@ -74,7 +81,7 @@ export function LoginScreen() {
                     Continue
                   </Text>
                 </Pressable>
-              </View>
+              </GlassPanel>
             </View>
           </Modal>
 
@@ -82,7 +89,10 @@ export function LoginScreen() {
           <View className="absolute bottom-24 -right-24 w-72 h-72 rounded-full bg-[#0f3a37]/40" />
 
           <View className="flex-1 px-5 pt-4">
-            <View className="rounded-3xl border border-[#1f2937] bg-[#0b1224] p-5">
+            <GlassPanel
+              className="rounded-3xl border-[#1f2937]"
+              contentStyle={{ padding: 20 }}
+            >
               <Text className="text-white text-3xl font-bold">
                 Organization Login
               </Text>
@@ -103,19 +113,24 @@ export function LoginScreen() {
                     </Pressable>
                   ) : null}
                 </View>
-                <View className="flex-row items-center rounded-xl border border-[#243041] bg-[#0f1729] px-3">
-                  <Ionicons name="call-outline" size={18} color="#7dd3fc" />
-                  <TextInput
-                    value={mobileNumber}
-                    onChangeText={setMobileNumber}
-                    placeholder="Enter mobile number"
-                    placeholderTextColor="#6b7280"
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    editable={!isAuthenticated}
-                    className="flex-1 py-3.5 pl-2 text-[#e2e8f0]"
-                  />
-                </View>
+                <GlassPanel
+                  className="rounded-xl border-[#243041]"
+                  contentStyle={{ paddingHorizontal: 12 }}
+                >
+                  <View className="flex-row items-center">
+                    <Ionicons name="call-outline" size={18} color="#7dd3fc" />
+                    <TextInput
+                      value={mobileNumber}
+                      onChangeText={setMobileNumber}
+                      placeholder="Enter mobile number"
+                      placeholderTextColor="#6b7280"
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      editable={!isAuthenticated}
+                      className="flex-1 py-3.5 pl-2 text-[#e2e8f0]"
+                    />
+                  </View>
+                </GlassPanel>
               </View>
 
               {otpRequested || isAuthenticated ? (
@@ -136,7 +151,10 @@ export function LoginScreen() {
                       </Pressable>
                     ) : null}
                   </View>
-                  <View className="rounded-xl border border-[#243041] bg-[#0f1729] px-3">
+                  <GlassPanel
+                    className="rounded-xl border-[#243041]"
+                    contentStyle={{ paddingHorizontal: 12 }}
+                  >
                     <TextInput
                       value={otp}
                       onChangeText={setOtp}
@@ -147,7 +165,7 @@ export function LoginScreen() {
                       editable={!isAuthenticated}
                       className="py-3.5 text-[#e2e8f0]"
                     />
-                  </View>
+                  </GlassPanel>
                 </View>
               ) : null}
 
@@ -180,10 +198,13 @@ export function LoginScreen() {
               {message ? (
                 <Text className="text-[#93c5fd] text-sm mt-4">{message}</Text>
               ) : null}
-            </View>
+            </GlassPanel>
 
             {isAuthenticated && userData ? (
-              <View className="mt-4 rounded-3xl border border-[#1f2937] bg-[#0b1224] p-5">
+              <GlassPanel
+                className="mt-4 rounded-3xl border-[#1f2937]"
+                contentStyle={{ padding: 20 }}
+              >
                 <Text className="text-white text-lg font-bold mb-3">
                   Logged In User
                 </Text>
@@ -202,7 +223,7 @@ export function LoginScreen() {
                 <Text className="text-[#7dd3fc] text-xs mt-3">
                   Token: {token}
                 </Text>
-              </View>
+              </GlassPanel>
             ) : null}
           </View>
         </>
