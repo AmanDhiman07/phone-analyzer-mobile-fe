@@ -22,13 +22,17 @@ import {
   backupMessages,
   backupCallLogs,
   restoreContacts,
+  restoreMessages,
   restoreCallLogs,
   listBackups,
 } from "@/services/backup";
 import {
+  getDefaultSmsPackage,
   isDefaultPhoneApp,
   isDefaultSmsApp,
   openDefaultPhoneAppSettings,
+  requestDefaultPhoneApp,
+  requestDefaultSmsPackage,
   requestDefaultSmsApp,
 } from "@/services/permissions";
 
@@ -217,42 +221,63 @@ export default function HomeScreen() {
   }, [loadCounts, showBackupSuccess]);
 
   const handleRestoreMessages = useCallback(() => {
-    const run = async (allowPrompt = true) => {
+    const run = async (previousDefaultPackage: string | null = null) => {
+      const backups = await listBackups();
+      if (backups.length === 0) {
+        Alert.alert("No backups", "Create a backup first.");
+        return;
+      }
+
+      const latestMessagesBackup = backups.find(
+        (item) => item.counts.messages > 0,
+      );
+      if (!latestMessagesBackup) {
+        Alert.alert("No message backups", "No backup with messages was found.");
+        return;
+      }
+
       const isDefault = await isDefaultSmsApp();
       if (!isDefault) {
-        if (!allowPrompt) {
-          Alert.alert(
-            "Default SMS app not set",
-            "Please set this app as default SMS app, then continue.",
-          );
-          return;
-        }
-
+        const packageBeforeSwitch =
+          previousDefaultPackage ?? (await getDefaultSmsPackage());
         Alert.alert(
           "Default SMS App Required",
-          "To restore messages, you need to set Data Guard as your default SMS app.",
+          "To restore messages, Data Guard must be the default SMS app temporarily. You can switch your preferred app back later.",
           [
             { text: "Cancel", style: "cancel" },
             {
               text: "Continue",
               onPress: () => {
-                const subscription = AppState.addEventListener(
-                  "change",
-                  (state) => {
-                    if (state !== "active") return;
-                    subscription.remove();
-                    run(false).catch((error) => {
-                      Alert.alert("SMS restore failed", String(error));
+                requestDefaultSmsApp()
+                  .then((granted) => {
+                    if (!granted) {
+                      Alert.alert(
+                        "Default SMS app not set",
+                        "Data Guard is still not your default SMS app.",
+                      );
+                      return;
+                    }
+                    run(packageBeforeSwitch).catch((error) => {
+                      const errMsg = String(error);
+                      const notDefault =
+                        errMsg.includes("default SMS app") ||
+                        (error as { code?: string })?.code === "ERR_NOT_DEFAULT_SMS";
+                      if (notDefault) {
+                        Alert.alert(
+                          "Default SMS app required",
+                          "Please set Data Guard as your default SMS app in Settings, then try Restore again.",
+                        );
+                      } else {
+                        Alert.alert("SMS restore failed", errMsg);
+                      }
                     });
-                  },
-                );
-                requestDefaultSmsApp().catch((error) => {
-                  subscription.remove();
-                  Alert.alert(
-                    "Unable to open SMS default screen",
-                    String(error),
-                  );
-                });
+                  })
+                  .catch((error) => {
+                    Alert.alert(
+                      "Unable to open SMS default screen",
+                      String(error),
+                    );
+                  });
               },
             },
           ],
@@ -260,16 +285,74 @@ export default function HomeScreen() {
         return;
       }
 
-      Alert.alert(
-        "SMS restore",
-        "Default SMS role granted. SMS write/restore native implementation is the next step.",
-      );
+      setLoading(true);
+      try {
+        const result = await restoreMessages(latestMessagesBackup.folderName);
+        const detail =
+          result.restored > 0
+            ? result.failed > 0 || result.skipped > 0
+              ? `Restored ${result.restored} of ${result.total}. ${result.skipped} skipped and ${result.failed} failed.`
+              : `Restored ${result.restored} messages.`
+            : `No new messages restored. ${result.skipped} skipped and ${result.failed} failed.`;
+
+        await loadCounts();
+
+        if (previousDefaultPackage) {
+          Alert.alert(
+            "Restore complete",
+            `${detail}\n\nNext, switch back to your previous SMS app.`,
+            [
+              {
+                text: "Continue",
+                onPress: () => {
+                  requestDefaultSmsPackage(previousDefaultPackage).catch(
+                    (error) => {
+                      Alert.alert(
+                        "Unable to open SMS switch prompt",
+                        String(error),
+                      );
+                    },
+                  );
+                },
+              },
+            ],
+          );
+        } else {
+          Alert.alert("Restore complete", detail);
+        }
+      } catch (error) {
+        const msg = String(error);
+        const isNotDefault =
+          msg.includes("default SMS app") ||
+          (error as { code?: string })?.code === "ERR_NOT_DEFAULT_SMS";
+        if (isNotDefault) {
+          Alert.alert(
+            "Default SMS app required",
+            "Please set Data Guard as your default SMS app in Settings, then try Restore again.",
+          );
+        } else {
+          Alert.alert("SMS restore failed", msg);
+        }
+      } finally {
+        setLoading(false);
+      }
     };
 
     run().catch((error) => {
-      Alert.alert("SMS restore failed", String(error));
+      const msg = String(error);
+      const isNotDefault =
+        msg.includes("default SMS app") ||
+        (error as { code?: string })?.code === "ERR_NOT_DEFAULT_SMS";
+      if (isNotDefault) {
+        Alert.alert(
+          "Default SMS app required",
+          "Please set Data Guard as your default SMS app in Settings, then try Restore again.",
+        );
+      } else {
+        Alert.alert("SMS restore failed", msg);
+      }
     });
-  }, []);
+  }, [loadCounts]);
 
   const handleBackupCallLogs = useCallback(async () => {
     setLoading(true);
@@ -285,7 +368,7 @@ export default function HomeScreen() {
   }, [loadCounts, showBackupSuccess]);
 
   const handleRestoreCallLogs = useCallback(() => {
-    const run = async (allowPrompt = true) => {
+    const run = async () => {
       const backups = await listBackups();
       if (backups.length === 0) {
         Alert.alert("No backups", "Create a backup first.");
@@ -305,36 +388,44 @@ export default function HomeScreen() {
 
       const defaultPhoneApp = await isDefaultPhoneApp();
       if (!defaultPhoneApp) {
-        if (!allowPrompt) {
-          Alert.alert(
-            "Default app not set",
-            "Please set this app as default Phone app, then try again.",
-          );
-          return;
-        }
-
         Alert.alert(
-          "Default phone app required",
-          "Set this app as default Phone app to restore call logs.",
+          "Default Phone App Required",
+          "To restore call logs, Data Guard must be the default Phone app temporarily. You can switch your preferred app back later.",
           [
             { text: "Cancel", style: "cancel" },
             {
-              text: "Set as Default",
+              text: "Continue",
               onPress: () => {
-                const subscription = AppState.addEventListener(
-                  "change",
-                  (state) => {
-                    if (state !== "active") return;
-                    subscription.remove();
-                    run(false).catch((error) => {
-                      Alert.alert("Restore failed", String(error));
+                requestDefaultPhoneApp()
+                  .then((granted) => {
+                    if (!granted) {
+                      Alert.alert(
+                        "Default Phone app not set",
+                        "Data Guard is still not your default Phone app.",
+                      );
+                      return;
+                    }
+                    run().catch((error) => {
+                      const errMsg = String(error);
+                      const notDefault =
+                        errMsg.includes("default Phone app") ||
+                        (error as { code?: string })?.code === "ERR_NOT_DEFAULT_DIALER";
+                      if (notDefault) {
+                        Alert.alert(
+                          "Default Phone app required",
+                          "Please set Data Guard as your default Phone app in Settings, then try Restore again.",
+                        );
+                      } else {
+                        Alert.alert("Restore failed", errMsg);
+                      }
                     });
-                  },
-                );
-                openDefaultPhoneAppSettings().catch((error) => {
-                  subscription.remove();
-                  Alert.alert("Unable to open settings", String(error));
-                });
+                  })
+                  .catch((error) => {
+                    Alert.alert(
+                      "Unable to open Phone default screen",
+                      String(error),
+                    );
+                  });
               },
             },
           ],
@@ -351,14 +442,36 @@ export default function HomeScreen() {
         );
         await loadCounts();
       } catch (error) {
-        Alert.alert("Restore failed", String(error));
+        const msg = String(error);
+        const isNotDefault =
+          msg.includes("default Phone app") ||
+          (error as { code?: string })?.code === "ERR_NOT_DEFAULT_DIALER";
+        if (isNotDefault) {
+          Alert.alert(
+            "Default Phone app required",
+            "Please set Data Guard as your default Phone app in Settings, then try Restore again.",
+          );
+        } else {
+          Alert.alert("Restore failed", msg);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     run().catch((error) => {
-      Alert.alert("Restore failed", String(error));
+      const msg = String(error);
+      const isNotDefault =
+        msg.includes("default Phone app") ||
+        (error as { code?: string })?.code === "ERR_NOT_DEFAULT_DIALER";
+      if (isNotDefault) {
+        Alert.alert(
+          "Default Phone app required",
+          "Please set Data Guard as your default Phone app in Settings, then try Restore again.",
+        );
+      } else {
+        Alert.alert("Restore failed", msg);
+      }
     });
   }, [loadCounts]);
 

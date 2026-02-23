@@ -16,7 +16,10 @@ import {
   getSmsList,
   getCallLogList,
 } from "./nativeSmsAndCallLog";
-import { restoreCallLogsNative } from "@/services/permissions";
+import {
+  restoreMessagesNative,
+  restoreCallLogsNative,
+} from "@/services/permissions";
 
 const getBackupRoot = () =>
   `${FileSystem.documentDirectory}Backups/${BACKUP_FOLDER_NAME}`;
@@ -430,6 +433,32 @@ export async function restoreCallLogs(backupFolderName: string): Promise<{
   }
 
   return restoreCallLogsNative(parsed);
+}
+
+export async function restoreMessages(backupFolderName: string): Promise<{
+  restored: number;
+  skipped: number;
+  failed: number;
+  total: number;
+}> {
+  if (Platform.OS !== "android") {
+    throw new Error("SMS restore is supported on Android only.");
+  }
+
+  const backupDir = `${getBackupsDir()}/${backupFolderName}`;
+  const messagesPath = `${backupDir}/${MESSAGES_FILE}`;
+  const info = await FileSystem.getInfoAsync(messagesPath);
+  if (!info.exists) {
+    throw new Error("Selected backup does not include messages.");
+  }
+
+  const raw = await FileSystem.readAsStringAsync(messagesPath);
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("Invalid messages backup format.");
+  }
+
+  return restoreMessagesNative(parsed);
 }
 
 export async function listBackups(): Promise<BackupRecord[]> {
