@@ -592,9 +592,17 @@ export default function HomeScreen() {
           </View>
           <Pressable
             onPress={() => router.push("/history")}
-            className="w-11 h-11 rounded-2xl border border-[#23324a] bg-[#0f1729] items-center justify-center active:opacity-80"
+            className="w-12 h-12 rounded-full border border-[#1d3354] bg-[#1a2942] items-center justify-center active:opacity-80"
           >
-            <Ionicons name="archive-outline" size={21} color="#7dd3fc" />
+            <View className="w-7 h-7 items-center justify-center">
+              <Ionicons name="sync-outline" size={19} color="#e2e8f0" />
+              <Ionicons
+                name="cloud"
+                size={11}
+                color="#0ea5e9"
+                style={{ position: "absolute", right: -1, bottom: 0 }}
+              />
+            </View>
           </Pressable>
         </View>
       </View>
