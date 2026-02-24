@@ -81,9 +81,9 @@ function BackupCard({
         <Pressable
           onPress={onBackup}
           disabled={loading}
-          className="flex-1 rounded-xl bg-[#0ea5e9] py-3 active:opacity-80 disabled:opacity-50"
+          className="flex-1 rounded-xl bg-[#2563eb] py-3 active:opacity-80 disabled:opacity-50"
         >
-          <Text className="text-[#031324] text-center font-bold">Backup</Text>
+          <Text className="text-white text-center font-bold">Backup</Text>
         </Pressable>
         <Pressable
           onPress={onRestore}
@@ -577,11 +577,9 @@ export default function HomeScreen() {
                 onPress={() =>
                   setSuccessModal((prev) => ({ ...prev, visible: false }))
                 }
-                className="flex-1 rounded-xl bg-[#0ea5e9] py-3 active:opacity-80"
+                className="flex-1 rounded-xl bg-[#2563eb] py-3 active:opacity-80"
               >
-                <Text className="text-[#031324] text-center font-bold">
-                  Done
-                </Text>
+                <Text className="text-white text-center font-bold">Done</Text>
               </Pressable>
             </View>
           </GlassPanel>
@@ -615,7 +613,7 @@ export default function HomeScreen() {
               <Ionicons
                 name="cloud"
                 size={11}
-                color="#0ea5e9"
+                color="#2563eb"
                 style={{ position: "absolute", right: -1, bottom: 0 }}
               />
             </View>

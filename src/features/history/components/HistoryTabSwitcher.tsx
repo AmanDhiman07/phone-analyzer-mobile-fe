@@ -13,6 +13,8 @@ export function HistoryTabSwitcher({
   return (
     <GlassPanel
       className="mb-4 rounded-2xl border-[#2a384d]"
+      intensity={82}
+      overlayColor="rgba(12, 22, 40, 0.32)"
       contentStyle={{ padding: 4 }}
     >
       <View className="flex-row">

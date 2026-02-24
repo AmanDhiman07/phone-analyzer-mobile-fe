@@ -8,9 +8,13 @@ import { GlassPanel } from "@/components/GlassPanel";
 export function BackupListItem({
   item,
   onDelete,
+  onUpload,
+  uploadDisabled = false,
 }: {
   item: BackupRecord;
   onDelete: () => void;
+  onUpload: () => void;
+  uploadDisabled?: boolean;
 }) {
   const data = getBackupPresentation(item);
 
@@ -31,6 +35,13 @@ export function BackupListItem({
             {formatBackupDate(item.date)} • {formatSize(item.sizeBytes)}
           </Text>
         </View>
+        <Pressable
+          disabled={uploadDisabled}
+          className={`p-2 rounded-lg mr-2 active:opacity-80 ${uploadDisabled ? "bg-[#1f2937] border border-[#334155] opacity-50" : "bg-[#112d4d] border border-[#27507a]"}`}
+          onPress={onUpload}
+        >
+          <Ionicons name="cloud-upload-outline" size={19} color="#2563eb" />
+        </Pressable>
         <Pressable
           className="p-2 rounded-lg bg-[#1e293b] border border-[#2c3e56] mr-2 active:opacity-80"
           onPress={onDelete}

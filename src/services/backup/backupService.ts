@@ -620,6 +620,52 @@ export async function backupCallLogs(): Promise<{
   return { path: publicPath ?? backupDir, count: callLogs.length };
 }
 
+export async function prepareBackupContactsVcf(
+  backupFolderName: string,
+): Promise<{
+  uri: string;
+  name: string;
+  size: number;
+  mimeType: string;
+}> {
+  await ensureBackupDirsExist();
+
+  const backupDir = `${getBackupsDir()}/${backupFolderName}`;
+  const contactsPath = `${backupDir}/${CONTACTS_FILE}`;
+  const info = await FileSystem.getInfoAsync(contactsPath);
+  if (!info.exists) {
+    throw new Error("Selected backup does not include contacts.");
+  }
+
+  const raw = await FileSystem.readAsStringAsync(contactsPath);
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("Invalid contacts backup format.");
+  }
+
+  const contacts = parsed as Contacts.Contact[];
+  if (contacts.length === 0) {
+    throw new Error("Selected backup has no contacts.");
+  }
+
+  const payload = toVCardContacts(contacts);
+  const outputDir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+  if (!outputDir) {
+    throw new Error("Unable to prepare contacts file.");
+  }
+
+  const fileName = `contacts_${backupFolderName}.vcf`;
+  const outputUri = `${outputDir}${fileName}`;
+  await FileSystem.writeAsStringAsync(outputUri, payload);
+
+  return {
+    uri: outputUri,
+    name: fileName,
+    size: new Blob([payload]).size,
+    mimeType: "text/vcard",
+  };
+}
+
 export async function restoreContacts(backupFolderName: string): Promise<{
   restored: number;
   skipped: number;

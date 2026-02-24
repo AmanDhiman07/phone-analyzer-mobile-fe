@@ -3,8 +3,8 @@ import { View, type StyleProp, type ViewStyle } from "react-native";
 import { BlurView } from "expo-blur";
 import { cn } from "@/utils/cn";
 
-export const GLASS_BLUR_INTENSITY = 68;
-export const GLASS_OVERLAY_COLOR = "rgba(8, 15, 29, 0.46)";
+export const GLASS_BLUR_INTENSITY = 76;
+export const GLASS_OVERLAY_COLOR = "rgba(8, 15, 29, 0.38)";
 
 export function GlassPanel({
   children,

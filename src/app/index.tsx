@@ -120,7 +120,7 @@ export default function SplashScreen() {
               width: 132,
               height: 132,
               borderRadius: 999,
-              backgroundColor: "#0ea5e9",
+              backgroundColor: "#2563eb",
               opacity: pulseOpacity,
               transform: [{ scale: pulseScale }],
             }}
@@ -158,7 +158,7 @@ export default function SplashScreen() {
             style={{
               width: "100%",
               height: "100%",
-              backgroundColor: "#0ea5e9",
+              backgroundColor: "#2563eb",
               transform: [{ scaleX: progress }],
             }}
           />

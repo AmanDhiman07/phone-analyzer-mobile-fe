@@ -6,6 +6,7 @@ export {
   backupContacts,
   backupMessages,
   backupCallLogs,
+  prepareBackupContactsVcf,
   restoreContacts,
   restoreMessages,
   restoreCallLogs,

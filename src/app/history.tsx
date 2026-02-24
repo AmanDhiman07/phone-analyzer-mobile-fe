@@ -1,4 +1,10 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
 import {
   View,
   Text,
@@ -7,17 +13,20 @@ import {
   Alert,
   TextInput,
   PanResponder,
+  StyleSheet,
 } from "react-native";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { File } from "expo-file-system";
+import { BlurView } from "expo-blur";
 import { GlassPanel } from "@/components/GlassPanel";
 import {
   listBackups,
   deleteBackup,
   formatSize,
   formatBackupDate,
+  prepareBackupContactsVcf,
 } from "@/services/backup";
 import {
   clearAuthSession,
@@ -36,6 +45,27 @@ import {
   type HistoryTab,
   type SelectedVcf,
 } from "@/features/history";
+
+function ModalBackdrop({ children }: { children: ReactNode }) {
+  return (
+    <View className="flex-1 items-center justify-center px-6">
+      <BlurView
+        intensity={42}
+        tint="dark"
+        experimentalBlurMethod="dimezisBlurView"
+        style={StyleSheet.absoluteFillObject}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFillObject,
+          { backgroundColor: "rgba(2, 8, 23, 0.54)" },
+        ]}
+      />
+      {children}
+    </View>
+  );
+}
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -58,6 +88,7 @@ export default function HistoryScreen() {
   const [caseId, setCaseId] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<SelectedVcf[]>([]);
   const [isUploadingVcf, setIsUploadingVcf] = useState(false);
+  const [isPreparingBackupUpload, setIsPreparingBackupUpload] = useState(false);
   const [uploadSuccessModal, setUploadSuccessModal] = useState<{
     visible: boolean;
     message: string;
@@ -240,6 +271,45 @@ export default function HistoryScreen() {
     setSelectedFiles((prev) => prev.filter((file) => file.uri !== uri));
   }, []);
 
+  const handleUploadFromLocalBackup = useCallback(
+    async (item: BackupRecord) => {
+      if (isUploadingVcf || isPreparingBackupUpload) return;
+
+      if ((item.counts.contacts ?? 0) <= 0) {
+        Alert.alert(
+          "No contacts in backup",
+          "This backup does not contain contacts to upload.",
+        );
+        return;
+      }
+
+      setIsPreparingBackupUpload(true);
+      try {
+        const file = await prepareBackupContactsVcf(item.folderName);
+        setSelectedFiles([
+          {
+            name: file.name,
+            uri: file.uri,
+            size: file.size,
+            mimeType: file.mimeType,
+          },
+        ]);
+        setUploadName(item.folderName);
+        setCaseId("");
+        setUploadModalVisible(true);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to prepare backup for cloud upload.";
+        Alert.alert("Upload preparation failed", message);
+      } finally {
+        setIsPreparingBackupUpload(false);
+      }
+    },
+    [isPreparingBackupUpload, isUploadingVcf],
+  );
+
   const handleUploadVcf = useCallback(async () => {
     if (isUploadingVcf) return;
 
@@ -361,6 +431,7 @@ export default function HistoryScreen() {
     () => (activeTab === "local" ? backups.slice(0, 3) : []),
     [activeTab, backups],
   );
+  const isUploadBusy = isUploadingVcf || isPreparingBackupUpload;
 
   return (
     <SafeAreaView className="flex-1 bg-[#050a17]" edges={["top", "bottom"]}>
@@ -388,7 +459,7 @@ export default function HistoryScreen() {
           if (!isDeleting) setDeleteTarget(null);
         }}
       >
-        <View className="flex-1 bg-black/70 items-center justify-center px-6">
+        <ModalBackdrop>
           <GlassPanel
             className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
             contentStyle={{ padding: 20 }}
@@ -434,7 +505,7 @@ export default function HistoryScreen() {
               </Pressable>
             </View>
           </GlassPanel>
-        </View>
+        </ModalBackdrop>
       </Modal>
 
       <Modal
@@ -443,7 +514,7 @@ export default function HistoryScreen() {
         visible={uploadModalVisible}
         onRequestClose={() => setUploadModalVisible(false)}
       >
-        <View className="flex-1 bg-black/70 items-center justify-center px-6">
+        <ModalBackdrop>
           <GlassPanel
             className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
             contentStyle={{ padding: 20 }}
@@ -475,7 +546,7 @@ export default function HistoryScreen() {
             </GlassPanel>
 
             <Text className="text-[#94a3b8] text-[11px] font-semibold mb-1 uppercase">
-              Case ID
+              Title
             </Text>
             <GlassPanel
               className="mb-3 rounded-xl border-[#23324a]"
@@ -484,7 +555,7 @@ export default function HistoryScreen() {
               <TextInput
                 value={caseId}
                 onChangeText={setCaseId}
-                placeholder="Enter case ID"
+                placeholder="Enter Title"
                 placeholderTextColor="#64748b"
                 className="py-3 text-[#e2e8f0]"
               />
@@ -492,7 +563,7 @@ export default function HistoryScreen() {
 
             <Pressable
               onPress={handlePickVcfFiles}
-              disabled={isUploadingVcf}
+              disabled={isUploadBusy}
               className="rounded-xl border border-[#2c4f88] bg-[#162746] py-3 mb-3 active:opacity-80 disabled:opacity-50"
             >
               <Text className="text-[#93c5fd] text-center font-semibold">
@@ -532,7 +603,7 @@ export default function HistoryScreen() {
 
             <Pressable
               onPress={handleUploadVcf}
-              disabled={isUploadingVcf}
+              disabled={isUploadBusy}
               className="rounded-xl bg-[#2563eb] py-3.5 active:opacity-80 disabled:opacity-50"
             >
               <Text className="text-white text-center font-bold">
@@ -540,7 +611,7 @@ export default function HistoryScreen() {
               </Text>
             </Pressable>
             <Pressable
-              disabled={isUploadingVcf}
+              disabled={isUploadBusy}
               onPress={() => setUploadModalVisible(false)}
               className="py-3.5 mt-1 active:opacity-80 disabled:opacity-50"
             >
@@ -549,7 +620,7 @@ export default function HistoryScreen() {
               </Text>
             </Pressable>
           </GlassPanel>
-        </View>
+        </ModalBackdrop>
       </Modal>
 
       <Modal
@@ -560,7 +631,7 @@ export default function HistoryScreen() {
           setUploadSuccessModal((prev) => ({ ...prev, visible: false }))
         }
       >
-        <View className="flex-1 bg-black/70 items-center justify-center px-6">
+        <ModalBackdrop>
           <GlassPanel
             className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
             contentStyle={{ padding: 20 }}
@@ -602,7 +673,7 @@ export default function HistoryScreen() {
               <Text className="text-white text-center font-bold">Done</Text>
             </Pressable>
           </GlassPanel>
-        </View>
+        </ModalBackdrop>
       </Modal>
 
       <View className="absolute -top-20 -left-20 w-64 h-64 rounded-full bg-[#0d2a4d]/50" />
@@ -628,6 +699,7 @@ export default function HistoryScreen() {
           <LocalBackupsPanel
             backups={backups}
             onDelete={handleDelete}
+            onUpload={handleUploadFromLocalBackup}
             onGoHome={() => router.push("/home")}
           />
         ) : (

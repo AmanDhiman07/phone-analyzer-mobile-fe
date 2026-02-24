@@ -7,10 +7,12 @@ import { GlassPanel } from "@/components/GlassPanel";
 export function LocalBackupsPanel({
   backups,
   onDelete,
+  onUpload,
   onGoHome,
 }: {
   backups: BackupRecord[];
   onDelete: (item: BackupRecord) => void;
+  onUpload: (item: BackupRecord) => void;
   onGoHome: () => void;
 }) {
   return (
@@ -51,7 +53,12 @@ export function LocalBackupsPanel({
           data={backups}
           keyExtractor={(item) => item.folderName}
           renderItem={({ item }) => (
-            <BackupListItem item={item} onDelete={() => onDelete(item)} />
+            <BackupListItem
+              item={item}
+              onDelete={() => onDelete(item)}
+              onUpload={() => onUpload(item)}
+              uploadDisabled={item.counts.contacts === 0}
+            />
           )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 24 }}
