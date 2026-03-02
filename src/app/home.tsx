@@ -35,6 +35,10 @@ import {
   requestDefaultSmsPackage,
   requestDefaultSmsApp,
 } from "@/services/permissions";
+import {
+  getAuthSession,
+  type AuthSession,
+} from "@/services/auth/sessionStorage";
 
 function BackupCard({
   icon,
@@ -117,6 +121,7 @@ export default function HomeScreen() {
     count: 0,
     path: "",
   });
+  const [session, setSession] = useState<AuthSession | null>(null);
 
   const showBackupSuccess = useCallback(
     (label: string, count: number, path: string) => {
@@ -189,6 +194,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       loadCounts();
+      getAuthSession().then((value) => setSession(value));
     }, [loadCounts]),
   );
 
@@ -604,20 +610,23 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <Pressable
-            onPress={() => router.push("/history")}
-            className="w-12 h-12 rounded-full border border-[#1d3354] bg-[#1a2942] items-center justify-center active:opacity-80"
-          >
-            <View className="w-7 h-7 items-center justify-center">
-              <Ionicons name="sync-outline" size={19} color="#e2e8f0" />
-              <Ionicons
-                name="cloud"
-                size={11}
-                color="#2563eb"
-                style={{ position: "absolute", right: -1, bottom: 0 }}
-              />
-            </View>
-          </Pressable>
+          {session ? (
+            <Pressable
+              onPress={() => router.push("/history")}
+              className="w-12 h-12 rounded-full border border-[#1d3354] bg-[#1a2942] items-center justify-center active:opacity-80"
+            >
+              <Ionicons name="person" size={22} color="#e2e8f0" />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => router.push("/(tabs)/firstTab")}
+              className="rounded-full border border-[#1d3354] bg-[#1a2942] px-4 py-2.5 items-center justify-center active:opacity-80"
+            >
+              <Text className="text-[#e2e8f0] text-sm font-semibold">
+                Login
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
 

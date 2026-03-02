@@ -96,6 +96,13 @@
     "plugins": [
       "expo-router",
       "expo-contacts"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4b49549c-3309-4575-8839-2be41c9891e3"
+      }
+    },
+    "owner": "aman.dhiman"
   }
 }
