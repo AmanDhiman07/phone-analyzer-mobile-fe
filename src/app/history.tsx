@@ -680,6 +680,7 @@ export default function HistoryScreen() {
 
       <HistoryHeader
         activeTab={activeTab}
+        onBack={() => router.back()}
         onOpenSidebar={() => setSidebarVisible(true)}
         onRefresh={() => {
           loadBackups();
