@@ -9,6 +9,8 @@ import {
   Clipboard,
   RefreshControl,
   ScrollView,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,11 +24,13 @@ import {
   backupContacts,
   backupMessages,
   backupCallLogs,
+  prepareBackupContactsVcf,
   restoreContacts,
   restoreMessages,
   restoreCallLogs,
   listBackups,
 } from "@/services/backup";
+import { getApiBaseUrl } from "@/services/auth/authService";
 import {
   getDefaultSmsPackage,
   isDefaultPhoneApp,
@@ -122,6 +126,17 @@ export default function HomeScreen() {
     path: "",
   });
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [cloudUploadVisible, setCloudUploadVisible] = useState(false);
+  const [cloudUploadName, setCloudUploadName] = useState("");
+  const [cloudUploadCaseId, setCloudUploadCaseId] = useState("");
+  const [cloudUploadFile, setCloudUploadFile] = useState<{
+    uri: string;
+    name: string;
+    size: number;
+    mimeType?: string;
+  } | null>(null);
+  const [isUploadingVcf, setIsUploadingVcf] = useState(false);
+  const [cloudLoadingMessage, setCloudLoadingMessage] = useState("");
 
   const showBackupSuccess = useCallback(
     (label: string, count: number, path: string) => {
@@ -424,6 +439,170 @@ export default function HomeScreen() {
     }
   }, [handleBackupPermissionDenied, loadCounts, showBackupSuccess]);
 
+  const handleBackupContactsPress = useCallback(() => {
+    Alert.alert(
+      "Where to store?",
+      "Store backup locally on this device or upload to cloud.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Local", onPress: () => handleBackupContacts() },
+        {
+          text: "Cloud",
+          onPress: () => {
+            if (!session) {
+              Alert.alert(
+                "Login required",
+                "Please log in to backup contacts to the cloud.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Login",
+                    onPress: () => router.push("/(tabs)/firstTab"),
+                  },
+                ],
+              );
+              return;
+            }
+            (async () => {
+              setCloudLoadingMessage("Creating backup...");
+              setLoading(true);
+              try {
+                const { count } = await backupContacts();
+                if (count === 0) {
+                  Alert.alert("No contacts", "No contacts to backup.");
+                  return;
+                }
+                const backups = await listBackups();
+                const latest = backups.find((b) => b.counts.contacts > 0);
+                if (!latest) {
+                  Alert.alert("Backup failed", "Could not find the created backup.");
+                  return;
+                }
+                const file = await prepareBackupContactsVcf(latest.folderName);
+                setCloudUploadFile({
+                  uri: file.uri,
+                  name: file.name,
+                  size: file.size,
+                  mimeType: file.mimeType,
+                });
+                setCloudUploadName(latest.folderName);
+                setCloudUploadCaseId("");
+                setCloudUploadVisible(true);
+              } catch (e) {
+                const handled = handleBackupPermissionDenied("Contacts", e);
+                if (!handled) Alert.alert("Backup failed", String(e));
+              } finally {
+                setCloudLoadingMessage("");
+                setLoading(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [session, handleBackupContacts, handleBackupPermissionDenied]);
+
+  const handleBackupMessagesPress = useCallback(() => {
+    Alert.alert(
+      "Where to store?",
+      "Store backup locally on this device or upload to cloud.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Local", onPress: () => handleBackupMessages() },
+        {
+          text: "Cloud",
+          onPress: () => {
+            Alert.alert(
+              "Cloud backup for messages",
+              "Cloud backup is only available for contacts. Store messages locally?",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Store locally", onPress: () => handleBackupMessages() },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  }, [handleBackupMessages]);
+
+  const handleBackupCallLogsPress = useCallback(() => {
+    Alert.alert(
+      "Where to store?",
+      "Store backup locally on this device or upload to cloud.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Local", onPress: () => handleBackupCallLogs() },
+        {
+          text: "Cloud",
+          onPress: () => {
+            Alert.alert(
+              "Cloud backup for call logs",
+              "Cloud backup is only available for contacts. Store call logs locally?",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Store locally", onPress: () => handleBackupCallLogs() },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  }, [handleBackupCallLogs]);
+
+  const handleCloudUploadSubmit = useCallback(async () => {
+    if (!session?.token || !cloudUploadFile) return;
+    if (!cloudUploadName.trim()) {
+      Alert.alert("Name required", "Please enter a backup name.");
+      return;
+    }
+    if (!cloudUploadCaseId.trim()) {
+      Alert.alert("Title required", "Please enter the title.");
+      return;
+    }
+    setCloudLoadingMessage("Uploading to cloud...");
+    setIsUploadingVcf(true);
+    try {
+      const formData = new FormData();
+      formData.append("userName", cloudUploadName.trim());
+      formData.append("caseId", cloudUploadCaseId.trim());
+      formData.append("vcfFiles", {
+        uri: cloudUploadFile.uri,
+        name: cloudUploadFile.name,
+        type: cloudUploadFile.mimeType || "text/vcard",
+      } as unknown as Blob);
+      const response = await fetch(`${getApiBaseUrl()}/contact/analyze-vcf`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.token}` },
+        body: formData,
+      });
+      const json = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        data?: { summary?: { totalContacts: number; newContacts: number; existingContacts: number } };
+      };
+      if (!response.ok || json.success !== true) {
+        throw new Error(json.message || "Failed to upload");
+      }
+      setCloudUploadVisible(false);
+      setCloudUploadFile(null);
+      setCloudUploadName("");
+      setCloudUploadCaseId("");
+      const summary = json.data?.summary;
+      Alert.alert(
+        "Upload complete",
+        summary
+          ? `Total: ${summary.totalContacts}, New: ${summary.newContacts}, Existing: ${summary.existingContacts}`
+          : (json.message || "Contacts uploaded to cloud."),
+      );
+    } catch (e) {
+      Alert.alert("Upload failed", String(e));
+    } finally {
+      setCloudLoadingMessage("");
+      setIsUploadingVcf(false);
+    }
+  }, [session, cloudUploadFile, cloudUploadName, cloudUploadCaseId]);
+
   const handleRestoreCallLogs = useCallback(() => {
     const run = async () => {
       const backups = await listBackups();
@@ -592,6 +771,109 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      <Modal
+        transparent
+        animationType="fade"
+        visible={cloudLoadingMessage !== ""}
+        statusBarTranslucent
+      >
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <GlassPanel
+            className="rounded-2xl border-[#1e293b] min-w-[200px]"
+            contentStyle={{ padding: 24, alignItems: "center" }}
+          >
+            <ActivityIndicator size="large" color="#60a5fa" />
+            <Text className="text-white text-base font-semibold mt-4">
+              {cloudLoadingMessage}
+            </Text>
+          </GlassPanel>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={cloudUploadVisible}
+        onRequestClose={() => {
+          if (!isUploadingVcf) {
+            setCloudUploadVisible(false);
+            setCloudUploadFile(null);
+          }
+        }}
+      >
+        <View className="flex-1 bg-black/70 items-center justify-center px-6">
+          <GlassPanel
+            className="w-full max-w-[360px] rounded-3xl border-[#1e293b]"
+            contentStyle={{ padding: 20 }}
+          >
+            <View className="w-14 h-14 rounded-2xl bg-[#173f85] items-center justify-center mb-4 self-center">
+              <Ionicons name="cloud-upload" size={28} color="#60a5fa" />
+            </View>
+            <Text className="text-white text-center text-xl font-bold mb-1">
+              Upload to Cloud
+            </Text>
+            <Text className="text-[#9ca3af] text-center text-sm mb-4">
+              Backup is ready. Enter name and title to upload.
+            </Text>
+            <Text className="text-[#94a3b8] text-[11px] font-semibold mb-1 uppercase">
+              Name
+            </Text>
+            <GlassPanel
+              className="mb-3 rounded-xl border-[#23324a]"
+              contentStyle={{ paddingHorizontal: 12 }}
+            >
+              <TextInput
+                value={cloudUploadName}
+                onChangeText={setCloudUploadName}
+                placeholder="e.g. My contacts backup"
+                placeholderTextColor="#64748b"
+                className="py-3 text-[#e2e8f0]"
+              />
+            </GlassPanel>
+            <Text className="text-[#94a3b8] text-[11px] font-semibold mb-1 uppercase">
+              Title
+            </Text>
+            <GlassPanel
+              className="mb-4 rounded-xl border-[#23324a]"
+              contentStyle={{ paddingHorizontal: 12 }}
+            >
+              <TextInput
+                value={cloudUploadCaseId}
+                onChangeText={setCloudUploadCaseId}
+                placeholder="Enter title"
+                placeholderTextColor="#64748b"
+                className="py-3 text-[#e2e8f0]"
+              />
+            </GlassPanel>
+            <View className="flex-row gap-3">
+              <Pressable
+                disabled={isUploadingVcf}
+                onPress={() => {
+                  setCloudUploadVisible(false);
+                  setCloudUploadFile(null);
+                  setCloudUploadName("");
+                  setCloudUploadCaseId("");
+                }}
+                className="flex-1 rounded-xl border border-[#334155] bg-[#111827] py-3 active:opacity-80 disabled:opacity-50"
+              >
+                <Text className="text-[#e5e7eb] text-center font-semibold">
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                disabled={isUploadingVcf}
+                onPress={handleCloudUploadSubmit}
+                className="flex-1 rounded-xl bg-[#2563eb] py-3 active:opacity-80 disabled:opacity-50"
+              >
+                <Text className="text-white text-center font-bold">
+                  {isUploadingVcf ? "Uploading..." : "Upload"}
+                </Text>
+              </Pressable>
+            </View>
+          </GlassPanel>
+        </View>
+      </Modal>
+
       <View className="absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[#0d2a4d]/60" />
       <View className="absolute top-52 -left-24 w-56 h-56 rounded-full bg-[#0f3a37]/40" />
 
@@ -674,9 +956,9 @@ export default function HomeScreen() {
           icon="people"
           label="Contacts"
           count={contactsCount}
-          onBackup={handleBackupContacts}
+          onBackup={handleBackupContactsPress}
           onRestore={handleRestoreContacts}
-          loading={loading}
+          loading={loading || isUploadingVcf}
           accentBg="bg-[#132e4f]"
           accentText="#7dd3fc"
         />
@@ -684,9 +966,9 @@ export default function HomeScreen() {
           icon="chatbubbles"
           label="Messages"
           count={messagesCount}
-          onBackup={handleBackupMessages}
+          onBackup={handleBackupMessagesPress}
           onRestore={handleRestoreMessages}
-          loading={loading}
+          loading={loading || isUploadingVcf}
           accentBg="bg-[#10302a]"
           accentText="#5eead4"
         />
@@ -694,9 +976,9 @@ export default function HomeScreen() {
           icon="call"
           label="Call Logs"
           count={callLogsCount}
-          onBackup={handleBackupCallLogs}
+          onBackup={handleBackupCallLogsPress}
           onRestore={handleRestoreCallLogs}
-          loading={loading}
+          loading={loading || isUploadingVcf}
           accentBg="bg-[#35280f]"
           accentText="#fbbf24"
         />
