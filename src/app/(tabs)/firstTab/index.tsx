@@ -1,5 +1,5 @@
-import { LoginScreen } from "@/features/auth/login";
+import LoginPage from "@/pages/login";
 
 export default function FirstTab() {
-  return <LoginScreen />;
+  return <LoginPage />;
 }
