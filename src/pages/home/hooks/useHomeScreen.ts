@@ -15,11 +15,11 @@ import {
   restoreContacts,
   restoreMessages,
 } from "@/services/backup";
-import { getApiBaseUrl } from "@/services/auth/authService";
 import {
   getAuthSession,
   type AuthSession,
 } from "@/services/auth/sessionStorage";
+import { uploadVcfFilesToCloud } from "@/services/cloud/vcfUploadService";
 import {
   getDefaultSmsPackage,
   isDefaultPhoneApp,
@@ -396,7 +396,7 @@ export function useHomeScreen(): HomeViewModel {
                   { text: "Cancel", style: "cancel" },
                   {
                     text: "Login",
-                    onPress: () => router.push("/(tabs)/firstTab"),
+                    onPress: () => router.push("/login"),
                   },
                 ],
               );
@@ -526,51 +526,35 @@ export function useHomeScreen(): HomeViewModel {
     setIsUploadingVcf(true);
 
     try {
-      const formData = new FormData();
-      formData.append("userName", cloudUploadName.trim());
-      formData.append("caseId", cloudUploadCaseId.trim());
-      formData.append("vcfFiles", {
-        uri: cloudUploadFile.uri,
-        name: cloudUploadFile.name,
-        type: cloudUploadFile.mimeType || "text/vcard",
-      } as unknown as Blob);
-
-      const response = await fetch(`${getApiBaseUrl()}/contact/analyze-vcf`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.token}` },
-        body: formData,
+      const result = await uploadVcfFilesToCloud({
+        token: session.token,
+        userName: cloudUploadName.trim(),
+        caseId: cloudUploadCaseId.trim(),
+        files: [
+          {
+            uri: cloudUploadFile.uri,
+            name: cloudUploadFile.name,
+            mimeType: cloudUploadFile.mimeType,
+          },
+        ],
       });
-
-      const json = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-        data?: {
-          summary?: {
-            totalContacts: number;
-            newContacts: number;
-            existingContacts: number;
-          };
-        };
-      };
-
-      if (!response.ok || json.success !== true) {
-        throw new Error(json.message || "Failed to upload");
-      }
 
       setCloudUploadVisible(false);
       setCloudUploadFile(null);
       setCloudUploadName("");
       setCloudUploadCaseId("");
 
-      const summary = json.data?.summary;
+      const summary = result.summary;
       Alert.alert(
         "Upload complete",
         summary
           ? `Total: ${summary.totalContacts}, New: ${summary.newContacts}, Existing: ${summary.existingContacts}`
-          : json.message || "Contacts uploaded to cloud.",
+          : result.message || "Contacts uploaded to cloud.",
       );
     } catch (error) {
-      Alert.alert("Upload failed", String(error));
+      const message =
+        error instanceof Error ? error.message : "Failed to upload.";
+      Alert.alert("Upload failed", message);
     } finally {
       setCloudLoadingMessage("");
       setIsUploadingVcf(false);
@@ -712,7 +696,7 @@ export function useHomeScreen(): HomeViewModel {
   }, [router]);
 
   const onOpenLogin = useCallback(() => {
-    router.push("/(tabs)/firstTab");
+    router.push("/login");
   }, [router]);
 
   return {

@@ -33,7 +33,7 @@ import {
   getAuthSession,
   type AuthSession,
 } from "@/services/auth/sessionStorage";
-import { getApiBaseUrl } from "@/services/auth/authService";
+import { uploadVcfFilesToCloud } from "@/services/cloud/vcfUploadService";
 import type { BackupRecord } from "@/types/backup";
 import {
   CloudBackupsPanel,
@@ -171,7 +171,7 @@ export default function HistoryScreen() {
 
   const handleCloudLogin = useCallback(() => {
     setSidebarVisible(false);
-    router.push("/(tabs)/firstTab");
+    router.push("/login");
   }, [router]);
 
   const handleSignOut = useCallback(async () => {
@@ -339,48 +339,19 @@ export default function HistoryScreen() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("userName", uploadName.trim());
-    formData.append("caseId", caseId.trim());
-    selectedFiles.forEach((file) => {
-      formData.append("vcfFiles", {
-        uri: file.uri,
-        name: file.name,
-        type: file.mimeType || "text/vcard",
-      } as unknown as Blob);
-    });
-
     setIsUploadingVcf(true);
     try {
-      const response = await fetch(`${getApiBaseUrl()}/contact/analyze-vcf`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
-        body: formData,
+      const result = await uploadVcfFilesToCloud({
+        token: session.token,
+        userName: uploadName.trim(),
+        caseId: caseId.trim(),
+        files: selectedFiles,
       });
-      const json = (await response.json()) as {
-        statusCode?: number;
-        success?: boolean;
-        message?: string;
-        data?: {
-          caseId?: string;
-          summary?: {
-            totalContacts: number;
-            newContacts: number;
-            existingContacts: number;
-          };
-        };
-      };
 
-      if (!response.ok || json.success !== true) {
-        throw new Error(json.message || "Failed to upload VCF files");
-      }
-
-      const summary = json.data?.summary ?? null;
+      const summary = result.summary ?? null;
       setUploadSuccessModal({
         visible: true,
-        message: json.message || "VCF analysis completed",
+        message: result.message || "VCF analysis completed",
         summary,
       });
       setUploadModalVisible(false);

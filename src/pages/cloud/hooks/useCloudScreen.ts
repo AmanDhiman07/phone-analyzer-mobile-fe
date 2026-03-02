@@ -27,7 +27,7 @@ export function useCloudScreen(): CloudViewModel {
   }, [router]);
 
   const onOpenLogin = useCallback(() => {
-    router.push("/(tabs)/firstTab");
+    router.push("/login");
   }, [router]);
 
   const onOpenHome = useCallback(() => {

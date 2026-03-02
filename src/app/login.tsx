@@ -1,5 +1,5 @@
 import LoginPage from "@/pages/login";
 
-export default function FirstTab() {
+export default function LoginRoute() {
   return <LoginPage />;
 }
