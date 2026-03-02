@@ -618,14 +618,25 @@ export default function HomeScreen() {
               <Ionicons name="person" size={22} color="#e2e8f0" />
             </Pressable>
           ) : (
-            <Pressable
-              onPress={() => router.push("/(tabs)/firstTab")}
-              className="rounded-full border border-[#1d3354] bg-[#1a2942] px-4 py-2.5 items-center justify-center active:opacity-80"
-            >
-              <Text className="text-[#e2e8f0] text-sm font-semibold">
-                Login
-              </Text>
-            </Pressable>
+            <View className="flex-row items-center gap-2">
+              <Pressable
+                onPress={() => router.push("/history?tab=local")}
+                className="rounded-full border border-[#1d3354] bg-[#1a2942] px-3 py-2.5 flex-row items-center gap-1.5 active:opacity-80"
+              >
+                <Ionicons name="folder-open-outline" size={18} color="#e2e8f0" />
+                <Text className="text-[#e2e8f0] text-sm font-semibold">
+                  Local backups
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push("/(tabs)/firstTab")}
+                className="rounded-full border border-[#1d3354] bg-[#1a2942] px-4 py-2.5 items-center justify-center active:opacity-80"
+              >
+                <Text className="text-[#e2e8f0] text-sm font-semibold">
+                  Login
+                </Text>
+              </Pressable>
+            </View>
           )}
         </View>
       </View>
